@@ -24,16 +24,11 @@
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_jsmn.h>
 
-#define FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL_HEADER           "X-aws-ec2-metadata-token-ttl-seconds"
-#define FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN       36
 
-#define FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL       "21600" // 6 hours (ie maximum ttl)
-#define FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN   5
 
 #define FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL                  21600
 
-#define FLB_FILTER_AWS_IMDS_V2_TOKEN_HEADER               "X-aws-ec2-metadata-token"
-#define FLB_FILTER_AWS_IMDS_V2_TOKEN_HEADER_LEN           24
+
 
 #define FLB_FILTER_AWS_IMDS_HOST                          "169.254.169.254"
 #define FLB_FILTER_AWS_IMDS_V2_TOKEN_PATH                 "/latest/api/token"
@@ -73,10 +68,27 @@
 #define FLB_FILTER_AWS_HOSTNAME_KEY                       "hostname"
 #define FLB_FILTER_AWS_HOSTNAME_KEY_LEN                   8
 
+/* Request headers */
+const static struct flb_aws_header imds_v2_token_ttl_header = {
+    .key = "X-aws-ec2-metadata-token-ttl-seconds",
+    .key_len = 36,
+    .val = "21600", // 6 hours (ie maximum ttl)
+    .val_len = 5,
+};
+
+/* Request header templates */
+const static struct flb_aws_header imds_v2_token_token_header_template = {
+    .key = "X-aws-ec2-metadata-token",
+    .key_len = 24,
+    .val = "",      // Replace with token value
+    .val_len = 0,   // Replace with token length
+};
+
+
 /* Metadata Service Context Struct */
 struct flb_aws_imds {
-    /* upstream connection to ec2 IMDS */
-    struct flb_upstream *ec2_upstream;
+    /* AWS Client to perform mockable requests to IMDS */
+    struct flb_aws_client *ec2_imds_client;
 
     /*
      * IMDSv2 requires a token which must be present in metadata requests
@@ -99,28 +111,27 @@ struct flb_aws_imds {
 };
 
 /* Default config values */
-const struct flb_aws_imds_config_s {
+const struct flb_aws_imds_config {
     int use_imds_version;
 } flb_aws_imds_config_default = {
     FLB_AWS_IMDS_VERSION_EVALUATE
 };
-typedef struct flb_aws_imds_config_s flb_aws_imds_config;
+// typedef struct flb_aws_imds_config_s flb_aws_imds_config;
 
 // Declarations
 /* Obtain the IMDS version */
-static int get_imds_version(struct flb_aws_imds *ctx, struct flb_http_client *client);
+static int get_imds_version(struct flb_aws_imds *ctx, struct flb_aws_client *client);
 
 /* 
  * Create IMDS Context
  * Returns NULL on error
+ * Note: Setting the FLB_IO_ASYNC flag is the job of the client.
  */
 struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
-                       flb_aws_imds_config *imds_config)
+                       struct flb_aws_imds_config *imds_config,
+                       struct flb_aws_client *ec2_imds_client)
 {
-    int use_v2;
-    int ret;
     struct flb_aws_imds *ctx = NULL;
-    const char *tmp = NULL;
 
     /* Create context */
     ctx = flb_calloc(1, sizeof(struct flb_aws_imds));
@@ -134,31 +145,37 @@ struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
      * Version may be evaluated later if set to FLB_AWS_IMDS_VERSION_EVALUATE
      */
     ctx->imds_version = imds_config->use_imds_version;
-    
-    /* Connect to upstream */
-    ctx->ec2_upstream = flb_upstream_create(config,
+
+    /* Detect IMDS support */
+    struct flb_upstream *ec2_upstream = flb_upstream_create(config,
                                             FLB_FILTER_AWS_IMDS_HOST,
                                             80,
                                             FLB_IO_TCP,
                                             NULL);
 
-    if (!ctx->ec2_upstream) {
-        flb_debug("[imds] unable to connect to EC2 IMDS upstream");
+    if (!ec2_upstream) {
+        flb_debug("[imds] unable to connect to EC2 IMDS on address %s",
+                  FLB_FILTER_AWS_IMDS_HOST);
+
         flb_free(ctx);
         return NULL;
     }
+    flb_upstream_destroy(ec2_upstream);
+    
+    /* Connect client */
+    ctx->ec2_imds_client = ec2_imds_client;
 
     /* Remove async flag from upstream */
-    ctx->ec2_upstream->flags &= ~(FLB_IO_ASYNC);
+    // ctx->client->flags &= ~(FLB_IO_ASYNC); // TODO: Remove, if not needed. Async setting is the job of caller.
     return ctx;
 }
 
-/* Destroy IMDS Context */
+/*
+ * Destroy IMDS Context
+ * The client is responsable for destroying
+ * the "ec2_imds_client" struct
+ */
 void flb_aws_imds_destroy(struct flb_aws_imds *ctx) {
-    if (ctx->ec2_upstream) {
-        flb_upstream_destroy(ctx->ec2_upstream);
-    }
-
     if (ctx->imds_v2_token) {
         flb_sds_destroy(ctx->imds_v2_token);
     }
@@ -168,150 +185,105 @@ void flb_aws_imds_destroy(struct flb_aws_imds *ctx) {
     }
 }
 
-/*
- * Get an IMDSv2 token
- * Token installed in imds context
+/* 
+ * Get IMDS metadata.
  */
-static int get_ec2_token(struct flb_aws_imds *ctx)
+int flb_aws_imds_get_metadata(struct flb_aws_imds *ctx, char *metadata_path,
+                        flb_sds_t *metadata, size_t *metadata_len)
 {
-    int ret;
-    size_t b_sent;
-    struct flb_upstream_conn *u_conn;
-    struct flb_http_client *client;
-    
-    client = imds_http_client_create(ctx, FLB_HTTP_PUT, FLB_FILTER_AWS_IMDS_V2_TOKEN_PATH);
-    if (client == NULL) {
-        return -1;
-    };
-    u_conn = client->u_conn;
-
-    flb_http_add_header(client, FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL_HEADER,
-                        FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL_HEADER_LEN,
-                        FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL,
-                        FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL_HEADER_VAL_LEN);
-
-    /* Perform request */
-    ret = flb_http_do(client, &b_sent);
-    flb_debug("[imds] IMDSv2 token request http_do=%i, HTTP Status: %i", ret, client->resp.status);
-
-    if (ret != 0 || client->resp.status != 200) {
-        if (client->resp.payload_size > 0) {
-            flb_error("[imds] IMDSv2 token retrieval failure response\n%s", client->resp.payload);
-        }
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
-        return -1;
-    }
-
-    ctx->imds_v2_token = flb_sds_create_len(client->resp.payload,
-                                            client->resp.payload_size);
-    if (!ctx->imds_v2_token) {
-        flb_errno();
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
-        return -1;
-    }
-    ctx->imds_v2_token_len = client->resp.payload_size;
-
-    flb_http_client_destroy(client);
-    flb_upstream_conn_release(u_conn);
-    return 0;
+    return flb_aws_imds_get_metadata_by_key(ctx, metadata_path, metadata,
+                               metadata_len, NULL);
 }
 
-/* Get the metadata by key if the result is a json object.
+/* 
+ * Get IMDS metadata by key if the result is a json object.
  * If key is NULL, just return the value it gets.
  */
 int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_path,
                                flb_sds_t *metadata, size_t *metadata_len,
                                char *key)
 {
-    int ret;
-    size_t b_sent;
     flb_sds_t tmp;
     struct flb_upstream_conn *u_conn;
-    struct flb_http_client *client;
+    
+    struct flb_http_client *c = NULL;
 
-    client = imds_http_client_create(ctx, FLB_HTTP_GET, metadata_path);
-    if (client == NULL) {
-        return -1;
-    }
-    u_conn = client->u_conn;
+    struct flb_aws_client *ec2_imds_client = ctx->ec2_imds_client;
+    struct flb_aws_header token_header = imds_v2_token_token_header_template;
 
     /* Get IMDS version */
-    int imds_version = get_imds_version(ctx, client);
+    int imds_version = get_imds_version(ctx, ec2_imds_client);
+
+    /* Abort on version detection failure */
+    if (imds_version == FLB_AWS_IMDS_VERSION_EVALUATE) {
+        // TODO: exit gracefully allowing for retrys
+    }
 
     if (imds_version == FLB_AWS_IMDS_VERSION_2) {
-        flb_http_add_header(client, FLB_FILTER_AWS_IMDS_V2_TOKEN_HEADER,
-                            FLB_FILTER_AWS_IMDS_V2_TOKEN_HEADER_LEN,
-                            ctx->imds_v2_token,
-                            ctx->imds_v2_token_len);
+        token_header.val = ctx->imds_v2_token;
+        token_header.val_len = ctx->imds_v2_token_len;
         flb_debug("[imds] using IMDSv2");
-    }
-    else {
+    } else {
         flb_debug("[imds] using IMDSv1");
     }
 
-    /* Perform request */
-    ret = flb_http_do(client, &b_sent);
-    flb_debug("[imds] metadata request http_do=%i, HTTP Status: %i",
-              ret, client->resp.status);
+    c = ec2_imds_client->client_vtable->request(ec2_imds_client, FLB_HTTP_GET,
+                                       metadata_path, NULL, 0,
+                                       &token_header,
+                                       (imds_version == FLB_AWS_IMDS_VERSION_1) ? 0 : 1);
+    if (!c) {
+        return -1;
+    }
 
     /* TODO: Detect invalid token */
+    if (imds_version == FLB_AWS_IMDS_VERSION_2 && "Placeholder") {
+        /* TODO: Refresh token and retry request */
+        
 
-    /* TODO: Refresh token an retry request */
+    }
 
-    if (ret != 0 || client->resp.status != 200) {
-        if (client->resp.payload_size > 0) {
+    if (c->resp.status != 200) {
+        if (c->resp.payload_size > 0) {
             flb_debug("[imds] metadata request failure response\n%s",
-                          client->resp.payload);
+                          c->resp.payload);
         }
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
+        flb_http_client_destroy(c);
         return -1;
     }
 
     if (key != NULL) {
         /* get the value of the key from payload json string */
-        tmp = flb_json_get_val(client->resp.payload,
-                               client->resp.payload_size, key);
+        tmp = flb_json_get_val(c->resp.payload,
+                               c->resp.payload_size, key);
         if (!tmp) {
             tmp = flb_sds_create_len("NULL", 4);
             flb_error("[imds] %s is undefined in EC2 instance", key);
         }
     } else {
-        tmp = flb_sds_create_len(client->resp.payload, client->resp.payload_size);
+        tmp = flb_sds_create_len(c->resp.payload, c->resp.payload_size);
     }
 
     if (!tmp) {
         flb_errno();
-        flb_http_client_destroy(client);
-        flb_upstream_conn_release(u_conn);
+        flb_http_client_destroy(c);
         return -1;
     }
 
     *metadata = tmp;
-    *metadata_len = key == NULL ? client->resp.payload_size : strlen(tmp);
+    *metadata_len = key == NULL ? c->resp.payload_size : strlen(tmp);
 
-    flb_http_client_destroy(client);
-    flb_upstream_conn_release(u_conn);
+    flb_http_client_destroy(c);
     return 0;
 }
 
 /* Obtain the IMDS version */
-static int get_imds_version(struct flb_aws_imds *ctx, struct flb_http_client *client) {
+static int get_imds_version(struct flb_aws_imds *ctx, struct flb_aws_client *client) {
     if (ctx->imds_version != FLB_AWS_IMDS_VERSION_EVALUATE) {
         return ctx->imds_version;
     }
 
     // TODO: Evaluate version
 
-}
-
-int flb_aws_imds_get_metadata(struct flb_aws_imds *ctx, char *metadata_path,
-                        flb_sds_t *metadata, size_t *metadata_len)
-{
-    return flb_aws_imds_get_metadata_by_key(ctx, metadata_path, metadata,
-                               metadata_len, NULL);
 }
 
 /* get VPC metadata, it called IMDS twice.
@@ -347,29 +319,50 @@ static int get_vpc_metadata(struct flb_aws_imds *ctx)
     return ret;
 }
 
-static struct flb_http_client *imds_http_client_create(struct flb_aws_imds *ctx,
-                                                       int method, char *metadata_path) {
-    struct flb_http_client *client;
-    struct flb_upstream_conn *u_conn;
+/*
+ * Get an IMDSv2 token
+ * Token preserved in imds context
+ */
+static int get_ec2_token(struct flb_aws_imds *ctx)
+{
+    struct flb_http_client *c = NULL;
+    struct flb_aws_client *ec2_imds_client = ctx->ec2_imds_client;
 
-    u_conn = flb_upstream_conn_get(ctx->ec2_upstream);
-    if (!u_conn) {
-        flb_error("[imds] unable to connect to EC2 IMDS upstream");
-        return NULL;
+    c = ec2_imds_client->client_vtable->request(ec2_imds_client, FLB_HTTP_PUT,
+                                       FLB_FILTER_AWS_IMDS_V2_TOKEN_PATH, NULL, 0,
+                                       &imds_v2_token_ttl_header, 1);
+
+    if (!c) {
+        return -1;
     }
 
-    /* Compose HTTP Client request */
-    client = flb_http_client(u_conn,
-                             method, metadata_path,
-                             NULL, 0,
-                             FLB_FILTER_AWS_IMDS_HOST, 80,
-                             NULL, 0);
+    if (c->resp.status != 200) {
+        if (c->resp.payload_size > 0) {
+            flb_error("[imds] IMDSv2 token retrieval failure response\n%s",
+                      c->resp.payload);
+        }
 
-    if (!client) {
-        flb_error("[imds] failed to create http client");
-        flb_upstream_conn_release(u_conn);
-        return NULL;
+        flb_http_client_destroy(c);
+        return -1;
     }
 
-    return client;
+    /* Preserve token information in ctx */
+    if (c->resp.payload_size > 0) {
+
+        ctx->imds_v2_token = flb_sds_create_len(c->resp.payload,
+                                                c->resp.payload_size);
+        if (!ctx->imds_v2_token) {
+            flb_errno();
+            flb_http_client_destroy(c);
+            return -1;
+        }
+        ctx->imds_v2_token_len = c->resp.payload_size;
+
+        flb_http_client_destroy(c);
+        return 0;
+    }
+
+    flb_debug("[imds] IMDS metadata response was empty");
+    flb_http_client_destroy(c);
+    return -1;
 }

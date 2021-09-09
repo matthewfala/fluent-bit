@@ -48,8 +48,7 @@ struct flb_aws_provider_ec2 {
     struct flb_aws_credentials *creds;
     time_t next_refresh;
 
-    /* upstream connection to IMDS */
-     struct flb_aws_client *client;
+    struct flb_aws_imds *imds;
 };
 
 struct flb_aws_credentials *get_credentials_fn_ec2(struct flb_aws_provider
