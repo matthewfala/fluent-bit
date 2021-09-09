@@ -23,7 +23,7 @@
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_jsmn.h>
-
+#include <fluent-bit/aws/flb_aws_imds.h>
 
 
 #define FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL                  21600
@@ -35,10 +35,6 @@
 
 #define FLB_AWS_IMDS_ROLE_PATH                            "/latest/meta-data/iam/security-credentials/"
 #define FLB_AWS_IMDS_ROLE_PATH_LEN                        43
-
-#define FLB_AWS_IMDS_VERSION_EVALUATE                     0
-#define FLB_AWS_IMDS_VERSION_1                            1
-#define FLB_AWS_IMDS_VERSION_2                            2
 
 
 #define FLB_FILTER_AWS_IMDS_INSTANCE_ID_PATH              "/latest/meta-data/instance-id/"
@@ -110,12 +106,6 @@ struct flb_aws_imds {
     size_t vpc_id_len;
 };
 
-/* Default config values */
-const struct flb_aws_imds_config {
-    int use_imds_version;
-} flb_aws_imds_config_default = {
-    FLB_AWS_IMDS_VERSION_EVALUATE
-};
 // typedef struct flb_aws_imds_config_s flb_aws_imds_config;
 
 // Declarations
@@ -128,7 +118,7 @@ static int get_imds_version(struct flb_aws_imds *ctx, struct flb_aws_client *cli
  * Note: Setting the FLB_IO_ASYNC flag is the job of the client.
  */
 struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
-                       struct flb_aws_imds_config *imds_config,
+                       struct flb_aws_imds_config *imds_config, // FLB_AWS_IMDS_VERSION_EVALUATE for automatic detection
                        struct flb_aws_client *ec2_imds_client)
 {
     struct flb_aws_imds *ctx = NULL;
@@ -183,12 +173,14 @@ void flb_aws_imds_destroy(struct flb_aws_imds *ctx) {
     if (ctx->vpc_id) {
         flb_sds_destroy(ctx->vpc_id);
     }
+
+    flb_free(ctx);
 }
 
 /* 
  * Get IMDS metadata.
  */
-int flb_aws_imds_get_metadata(struct flb_aws_imds *ctx, char *metadata_path,
+int flb_imds_request(struct flb_aws_imds *ctx, char *metadata_path,
                         flb_sds_t *metadata, size_t *metadata_len)
 {
     return flb_aws_imds_get_metadata_by_key(ctx, metadata_path, metadata,

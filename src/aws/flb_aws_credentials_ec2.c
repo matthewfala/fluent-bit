@@ -23,6 +23,7 @@
 #include <fluent-bit/flb_aws_credentials.h>
 #include <fluent-bit/flb_aws_util.h>
 #include <fluent-bit/flb_jsmn.h>
+#include <fluent-bit/aws/flb_aws_imds.h>
 
 #include <stdlib.h>
 #include <time.h>
@@ -48,7 +49,11 @@ struct flb_aws_provider_ec2 {
     struct flb_aws_credentials *creds;
     time_t next_refresh;
 
-    struct flb_aws_imds *imds;
+    /* upstream connection to IMDS */
+    struct flb_aws_client *client;
+    
+    /* IMDS interface */
+    struct flb_aws_imds *imds_interface;
 };
 
 struct flb_aws_credentials *get_credentials_fn_ec2(struct flb_aws_provider
@@ -185,6 +190,10 @@ void destroy_fn_ec2(struct flb_aws_provider *provider) {
             flb_aws_credentials_destroy(implementation->creds);
         }
 
+        if (implementation->imds_interface) {
+            flb_aws_imds_destroy(implementation->imds_interface);
+        }
+
         if (implementation->client) {
             flb_aws_client_destroy(implementation->client);
         }
@@ -260,6 +269,10 @@ struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
     implementation->client->proxy = NULL;
     implementation->client->upstream = upstream;
 
+    /* Use default imds configuration */
+    struct flb_aws_imds_config imds_config = flb_aws_imds_config_default;
+    implementation->imds_interface = flb_aws_imds_create(config, imds_config, implementation->client);
+
     return provider;
 }
 
@@ -275,7 +288,7 @@ static int get_creds_ec2(struct flb_aws_provider_ec2 *implementation)
     flb_debug("[aws_credentials] requesting credentials from EC2 IMDS");
 
     /* Get the name of the instance role */
-    ret = flb_imds_request(implementation->client, AWS_IMDS_ROLE_PATH,
+    ret = flb_imds_request(implementation->imds_interface, AWS_IMDS_ROLE_PATH,
                            &instance_role, &instance_role_len);
 
     if (ret < 0) {
@@ -322,7 +335,7 @@ static int ec2_credentials_request(struct flb_aws_provider_ec2
     struct flb_aws_credentials *creds;
     time_t expiration;
 
-    ret = flb_imds_request(implementation->client, cred_path,
+    ret = flb_imds_request(implementation->imds_interface, cred_path,
                            &credentials_response, &credentials_response_len);
 
     if (ret < 0) {
