@@ -26,45 +26,41 @@
 #include <fluent-bit/aws/flb_aws_imds.h>
 
 
-#define FLB_FILTER_AWS_IMDS_V2_TOKEN_TTL                  21600
+#define FLB_AWS_IMDS_HOST                                   "169.254.169.254"
+#define FLB_AWS_IMDS_ROOT                                   "/"
+
+#define FLB_AWS_IMDS_V2_TOKEN_PATH                          "/latest/api/token"
+
+#define FLB_AWS_IMDS_ROLE_PATH                              "/latest/meta-data/iam/security-credentials/"
+#define FLB_AWS_IMDS_ROLE_PATH_LEN                          43
 
 
+#define FLB_AWS_IMDS_INSTANCE_ID_PATH                       "/latest/meta-data/instance-id/"
+#define FLB_AWS_IMDS_AZ_PATH                                "/latest/meta-data/placement/availability-zone/"
+#define FLB_AWS_IMDS_INSTANCE_TYPE_PATH                     "/latest/meta-data/instance-type/"
+#define FLB_AWS_IMDS_PRIVATE_IP_PATH                        "/latest/meta-data/local-ipv4/"
+#define FLB_AWS_IMDS_VPC_ID_PATH_PREFIX                     "/latest/meta-data/network/interfaces/macs/"
+#define FLB_AWS_IMDS_AMI_ID_PATH                            "/latest/meta-data/ami-id/"
+#define FLB_AWS_IMDS_ACCOUNT_ID_PATH                        "/latest/dynamic/instance-identity/document/"
+#define FLB_AWS_IMDS_HOSTNAME_PATH                          "/latest/meta-data/hostname/"
+#define FLB_AWS_IMDS_MAC_PATH                               "/latest/meta-data/mac/"
 
-#define FLB_FILTER_AWS_IMDS_HOST                          "169.254.169.254"
-#define FLB_FILTER_AWS_IMDS_ROOT                          "/"
-
-#define FLB_FILTER_AWS_IMDS_V2_TOKEN_PATH                 "/latest/api/token"
-
-#define FLB_AWS_IMDS_ROLE_PATH                            "/latest/meta-data/iam/security-credentials/"
-#define FLB_AWS_IMDS_ROLE_PATH_LEN                        43
-
-
-#define FLB_FILTER_AWS_IMDS_INSTANCE_ID_PATH              "/latest/meta-data/instance-id/"
-#define FLB_FILTER_AWS_IMDS_AZ_PATH                       "/latest/meta-data/placement/availability-zone/"
-#define FLB_FILTER_AWS_IMDS_INSTANCE_TYPE_PATH            "/latest/meta-data/instance-type/"
-#define FLB_FILTER_AWS_IMDS_PRIVATE_IP_PATH               "/latest/meta-data/local-ipv4/"
-#define FLB_FILTER_AWS_IMDS_VPC_ID_PATH_PREFIX            "/latest/meta-data/network/interfaces/macs/"
-#define FLB_FILTER_AWS_IMDS_AMI_ID_PATH                   "/latest/meta-data/ami-id/"
-#define FLB_FILTER_AWS_IMDS_ACCOUNT_ID_PATH               "/latest/dynamic/instance-identity/document/"
-#define FLB_FILTER_AWS_IMDS_HOSTNAME_PATH                 "/latest/meta-data/hostname/"
-#define FLB_FILTER_AWS_IMDS_MAC_PATH                      "/latest/meta-data/mac/"
-
-#define FLB_FILTER_AWS_AVAILABILITY_ZONE_KEY              "az"
-#define FLB_FILTER_AWS_AVAILABILITY_ZONE_KEY_LEN          2
-#define FLB_FILTER_AWS_INSTANCE_ID_KEY                    "ec2_instance_id"
-#define FLB_FILTER_AWS_INSTANCE_ID_KEY_LEN                15
-#define FLB_FILTER_AWS_INSTANCE_TYPE_KEY                  "ec2_instance_type"
-#define FLB_FILTER_AWS_INSTANCE_TYPE_KEY_LEN              17
-#define FLB_FILTER_AWS_PRIVATE_IP_KEY                     "private_ip"
-#define FLB_FILTER_AWS_PRIVATE_IP_KEY_LEN                 10
-#define FLB_FILTER_AWS_VPC_ID_KEY                         "vpc_id"
-#define FLB_FILTER_AWS_VPC_ID_KEY_LEN                     6
-#define FLB_FILTER_AWS_AMI_ID_KEY                         "ami_id"
-#define FLB_FILTER_AWS_AMI_ID_KEY_LEN                     6
-#define FLB_FILTER_AWS_ACCOUNT_ID_KEY                     "account_id"
-#define FLB_FILTER_AWS_ACCOUNT_ID_KEY_LEN                 10
-#define FLB_FILTER_AWS_HOSTNAME_KEY                       "hostname"
-#define FLB_FILTER_AWS_HOSTNAME_KEY_LEN                   8
+#define FLB_AWS_IMDS_AVAILABILITY_ZONE_KEY                  "az"
+#define FLB_AWS_IMDS_AVAILABILITY_ZONE_KEY_LEN              2
+#define FLB_AWS_IMDS_INSTANCE_ID_KEY                        "ec2_instance_id"
+#define FLB_AWS_IMDS_INSTANCE_ID_KEY_LEN                    15
+#define FLB_AWS_IMDS_INSTANCE_TYPE_KEY                      "ec2_instance_type"
+#define FLB_AWS_IMDS_INSTANCE_TYPE_KEY_LEN                  17
+#define FLB_AWS_IMDS_PRIVATE_IP_KEY                         "private_ip"
+#define FLB_AWS_IMDS_PRIVATE_IP_KEY_LEN                     10
+#define FLB_AWS_IMDS_VPC_ID_KEY                             "vpc_id"
+#define FLB_AWS_IMDS_VPC_ID_KEY_LEN                         6
+#define FLB_AWS_IMDS_AMI_ID_KEY                             "ami_id"
+#define FLB_AWS_IMDS_AMI_ID_KEY_LEN                         6
+#define FLB_AWS_IMDS_ACCOUNT_ID_KEY                         "account_id"
+#define FLB_AWS_IMDS_ACCOUNT_ID_KEY_LEN                     10
+#define FLB_AWS_IMDS_HOSTNAME_KEY                           "hostname"
+#define FLB_AWS_IMDS_HOSTNAME_KEY_LEN                       8
 
 /* Request headers */
 const static struct flb_aws_header imds_v2_token_ttl_header = {
@@ -141,14 +137,14 @@ struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
 
     /* Detect IMDS support */
     struct flb_upstream *ec2_upstream = flb_upstream_create(config,
-                                            FLB_FILTER_AWS_IMDS_HOST,
+                                            FLB_AWS_IMDS_HOST,
                                             80,
                                             FLB_IO_TCP,
                                             NULL);
 
     if (!ec2_upstream) {
         flb_debug("[imds] unable to connect to EC2 IMDS on address %s",
-                  FLB_FILTER_AWS_IMDS_HOST);
+                  FLB_AWS_IMDS_HOST);
 
         flb_free(ctx);
         return NULL;
@@ -304,7 +300,7 @@ static int get_imds_version(struct flb_aws_imds *ctx, struct flb_aws_client *cli
     invalid_token_header.val = "INVALID";
     invalid_token_header.val_len = 7;
     c = client->client_vtable->request(client, FLB_HTTP_GET,
-                                       FLB_FILTER_AWS_IMDS_ROOT, NULL, 0,
+                                       FLB_AWS_IMDS_ROOT, NULL, 0,
                                        &imds_v2_token_token_header_template, 1);
     
     if (!c) {
@@ -339,7 +335,7 @@ static int get_vpc_metadata(struct flb_aws_imds *ctx)
     size_t len = 0;
 
     /* get EC2 instance Mac id first before getting VPC id */
-    ret = get_metadata(ctx, FLB_FILTER_AWS_IMDS_MAC_PATH, &mac_id, &len);
+    ret = get_metadata(ctx, FLB_AWS_IMDS_MAC_PATH, &mac_id, &len);
 
     if (ret < 0) {
         flb_sds_destroy(mac_id);
@@ -371,7 +367,7 @@ static int refresh_ec2_token(struct flb_aws_imds *ctx)
     struct flb_aws_client *ec2_imds_client = ctx->ec2_imds_client;
 
     c = ec2_imds_client->client_vtable->request(ec2_imds_client, FLB_HTTP_PUT,
-                                       FLB_FILTER_AWS_IMDS_V2_TOKEN_PATH, NULL, 0,
+                                       FLB_AWS_IMDS_V2_TOKEN_PATH, NULL, 0,
                                        &imds_v2_token_ttl_header, 1);
 
     if (!c) {
