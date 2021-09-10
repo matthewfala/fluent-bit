@@ -31,6 +31,8 @@
 
 
 #define FLB_FILTER_AWS_IMDS_HOST                          "169.254.169.254"
+#define FLB_FILTER_AWS_IMDS_ROOT                          "/"
+
 #define FLB_FILTER_AWS_IMDS_V2_TOKEN_PATH                 "/latest/api/token"
 
 #define FLB_AWS_IMDS_ROLE_PATH                            "/latest/meta-data/iam/security-credentials/"
@@ -211,6 +213,8 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
     /* Abort on version detection failure */
     if (imds_version == FLB_AWS_IMDS_VERSION_EVALUATE) {
         // TODO: exit gracefully allowing for retrys
+        flb_warn("[imds] unable to evaluate IMDS version");
+        return -1;
     }
 
     if (imds_version == FLB_AWS_IMDS_VERSION_2) {
@@ -230,11 +234,11 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
     }
 
     /* Detect invalid token */
-    if (c->resp.status == 401) {
-        /* Detect IMDS version requirement change */
-        if (imds_version == FLB_AWS_IMDS_VERSION_1) {
+    if (imds_version == FLB_AWS_IMDS_VERSION_2 && c->resp.status == 401) {
+        /* TODO: Detect IMDS version requirement change */ // Can't test, so don't include
+        /* if (imds_version == FLB_AWS_IMDS_VERSION_1) {
             ctx->imds_version = FLB_AWS_IMDS_VERSION_2;
-        }
+        } */
 
         /* Refresh token and retry request */
         ret = refresh_ec2_token(ctx);
@@ -289,12 +293,39 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
 
 /* Obtain the IMDS version */
 static int get_imds_version(struct flb_aws_imds *ctx, struct flb_aws_client *client) {
+    struct flb_http_client *c = NULL;
+
     if (ctx->imds_version != FLB_AWS_IMDS_VERSION_EVALUATE) {
         return ctx->imds_version;
     }
 
-    // TODO: Evaluate version
+    // Evaluate version (send an invalid token)
+    struct flb_aws_header invalid_token_header = imds_v2_token_token_header_template;
+    invalid_token_header.val = "INVALID";
+    invalid_token_header.val_len = 7;
+    c = client->client_vtable->request(client, FLB_HTTP_GET,
+                                       FLB_FILTER_AWS_IMDS_ROOT, NULL, 0,
+                                       &imds_v2_token_token_header_template, 1);
+    
+    if (!c) {
+        return FLB_AWS_IMDS_VERSION_EVALUATE;
+    }
 
+    /* Unauthorized response means that IMDS version 2 is in use */
+    if (c->resp.status == 401) {
+        ctx->imds_version = FLB_AWS_IMDS_VERSION_2;
+        refresh_ec2_token(ctx);
+    }
+
+    /* Success means that IMDS version 1 is in use
+     * (Not Tested, TODO: Must test this on an instance without IMDSv2)
+     */
+    if (c->resp.status == 200) {
+        ctx->imds_version = FLB_AWS_IMDS_VERSION_1;
+    }
+
+    flb_http_client_destroy(c);
+    return ctx->imds_version;
 }
 
 /* get VPC metadata, it called IMDS twice.
