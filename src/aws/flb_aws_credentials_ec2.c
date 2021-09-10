@@ -272,6 +272,11 @@ struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
     /* Use default imds configuration */
     struct flb_aws_imds_config imds_config = flb_aws_imds_config_default;
     implementation->imds_interface = flb_aws_imds_create(config, imds_config, implementation->client);
+    if (!implementation->imds_interface) {
+        flb_aws_provider_destroy(provider);
+        flb_error("[aws_credentials] EC2 IMDS configuration error");
+        return NULL;
+    }
 
     return provider;
 }

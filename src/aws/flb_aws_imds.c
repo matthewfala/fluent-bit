@@ -135,6 +135,7 @@ struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
      * Version may be evaluated later if set to FLB_AWS_IMDS_VERSION_EVALUATE
      */
     ctx->imds_version = imds_config->use_imds_version;
+    ctx->imds_v2_token = flb_sds_create_len("INVALID_TOKEN", 13);
 
     /* Detect IMDS support */
     struct flb_upstream *ec2_upstream = flb_upstream_create(config,
