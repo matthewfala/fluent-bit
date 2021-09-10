@@ -63,7 +63,7 @@
 #define FLB_AWS_IMDS_HOSTNAME_KEY_LEN                       8
 
 /* Request headers */
-const static struct flb_aws_header imds_v2_token_ttl_header = {
+static struct flb_aws_header imds_v2_token_ttl_header = {
     .key = "X-aws-ec2-metadata-token-ttl-seconds",
     .key_len = 36,
     .val = "21600", // 6 hours (ie maximum ttl)
@@ -71,50 +71,23 @@ const static struct flb_aws_header imds_v2_token_ttl_header = {
 };
 
 /* Request header templates */
-const static struct flb_aws_header imds_v2_token_token_header_template = {
+static struct flb_aws_header imds_v2_token_token_header_template = {
     .key = "X-aws-ec2-metadata-token",
     .key_len = 24,
     .val = "",      // Replace with token value
     .val_len = 0,   // Replace with token length
 };
 
+// Declarations
+static int get_imds_version(struct flb_aws_imds *ctx);
+static int refresh_imds_v2_token(struct flb_aws_imds *ctx);
 
-/* Metadata Service Context Struct */
-struct flb_aws_imds {
-    /* AWS Client to perform mockable requests to IMDS */
-    struct flb_aws_client *ec2_imds_client;
-
-    /*
-     * IMDSv2 requires a token which must be present in metadata requests
-     * This plugin does not refresh the token
-     */
-    flb_sds_t imds_v2_token;
-    size_t imds_v2_token_len;
-
-    /* 
-     * Plugin can use EC2 metadata v1 or v2; default is FLB_AWS_IMDS_VERSION_EVALUATE
-     * which is evaluated to FLB_AWS_IMDS_VERSION_1 or FLB_AWS_IMDS_VERSION_2 when
-     * the IMDS is used.
-     */
-    int imds_version;
-
-    /* EC2 Metadata fields to populate
-     */
-    flb_sds_t vpc_id;
-    size_t vpc_id_len;
+/* Default config values */
+const struct flb_aws_imds_config flb_aws_imds_config_default = {
+    FLB_AWS_IMDS_VERSION_EVALUATE
 };
 
-// typedef struct flb_aws_imds_config_s flb_aws_imds_config;
-
-// Declarations
-/* Obtain the IMDS version */
-static int get_imds_version(struct flb_aws_imds *ctx);
-
-/* 
- * Create IMDS Context
- * Returns NULL on error
- * Note: Setting the FLB_IO_ASYNC flag is the job of the client.
- */
+/* Create IMDS context */
 struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
                        struct flb_aws_imds_config *imds_config, // FLB_AWS_IMDS_VERSION_EVALUATE for automatic detection
                        struct flb_aws_client *ec2_imds_client)
@@ -159,11 +132,7 @@ struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
     return ctx;
 }
 
-/*
- * Destroy IMDS Context
- * The client is responsable for destroying
- * the "ec2_imds_client" struct
- */
+/* Destroy IMDS context */
 void flb_aws_imds_destroy(struct flb_aws_imds *ctx) {
     if (ctx->imds_v2_token) {
         flb_sds_destroy(ctx->imds_v2_token);
@@ -176,21 +145,16 @@ void flb_aws_imds_destroy(struct flb_aws_imds *ctx) {
     flb_free(ctx);
 }
 
-/* 
- * Get IMDS metadata.
- */
-int flb_imds_request(struct flb_aws_imds *ctx, char *metadata_path,
+/* Get IMDS metadata */
+int flb_aws_imds_request(struct flb_aws_imds *ctx, char *metadata_path,
                         flb_sds_t *metadata, size_t *metadata_len)
 {
-    return flb_aws_imds_get_metadata_by_key(ctx, metadata_path, metadata,
+    return flb_aws_imds_request_by_key(ctx, metadata_path, metadata,
                                metadata_len, NULL);
 }
 
-/* 
- * Get IMDS metadata by key if the result is a json object.
- * If key is NULL, just return the value it gets.
- */
-int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_path,
+/* Get IMDS metadata by key */
+int flb_aws_imds_request_by_key(struct flb_aws_imds *ctx, char *metadata_path,
                                flb_sds_t *metadata, size_t *metadata_len,
                                char *key)
 {
@@ -334,7 +298,7 @@ static int get_vpc_metadata(struct flb_aws_imds *ctx)
     size_t len = 0;
 
     /* get EC2 instance Mac id first before getting VPC id */
-    ret = get_metadata(ctx, FLB_AWS_IMDS_MAC_PATH, &mac_id, &len);
+    ret = flb_aws_imds_request(ctx, FLB_AWS_IMDS_MAC_PATH, &mac_id, &len);
 
     if (ret < 0) {
         flb_sds_destroy(mac_id);
@@ -348,7 +312,7 @@ static int get_vpc_metadata(struct flb_aws_imds *ctx)
     vpc_path = flb_sds_printf(&vpc_path, "%s/%s/%s/",
                               "/latest/meta-data/network/interfaces/macs",
                               mac_id, "vpc-id");
-    ret = get_metadata(ctx, vpc_path, &ctx->vpc_id, &ctx->vpc_id_len);
+    ret = flb_aws_imds_request(ctx, vpc_path, &ctx->vpc_id, &ctx->vpc_id_len);
 
     flb_sds_destroy(mac_id);
     flb_sds_destroy(vpc_path);

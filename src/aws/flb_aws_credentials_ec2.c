@@ -271,7 +271,7 @@ struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
 
     /* Use default imds configuration */
     struct flb_aws_imds_config imds_config = flb_aws_imds_config_default;
-    implementation->imds_interface = flb_aws_imds_create(config, imds_config, implementation->client);
+    implementation->imds_interface = flb_aws_imds_create(config, &imds_config, implementation->client);
     if (!implementation->imds_interface) {
         flb_aws_provider_destroy(provider);
         flb_error("[aws_credentials] EC2 IMDS configuration error");
@@ -293,7 +293,7 @@ static int get_creds_ec2(struct flb_aws_provider_ec2 *implementation)
     flb_debug("[aws_credentials] requesting credentials from EC2 IMDS");
 
     /* Get the name of the instance role */
-    ret = flb_imds_request(implementation->imds_interface, AWS_IMDS_ROLE_PATH,
+    ret = flb_aws_imds_request(implementation->imds_interface, AWS_IMDS_ROLE_PATH,
                            &instance_role, &instance_role_len);
 
     if (ret < 0) {
@@ -340,7 +340,7 @@ static int ec2_credentials_request(struct flb_aws_provider_ec2
     struct flb_aws_credentials *creds;
     time_t expiration;
 
-    ret = flb_imds_request(implementation->imds_interface, cred_path,
+    ret = flb_aws_imds_request(implementation->imds_interface, cred_path,
                            &credentials_response, &credentials_response_len);
 
     if (ret < 0) {
