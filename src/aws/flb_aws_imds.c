@@ -196,6 +196,7 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
                                flb_sds_t *metadata, size_t *metadata_len,
                                char *key)
 {
+    int ret;
     flb_sds_t tmp;
     struct flb_upstream_conn *u_conn;
     
@@ -228,11 +229,28 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
         return -1;
     }
 
-    /* TODO: Detect invalid token */
-    if (imds_version == FLB_AWS_IMDS_VERSION_2 && "Placeholder") {
-        /* TODO: Refresh token and retry request */
-        
+    /* Detect invalid token */
+    if (c->resp.status == 401) {
+        /* Detect IMDS version requirement change */
+        if (imds_version == FLB_AWS_IMDS_VERSION_1) {
+            ctx->imds_version = FLB_AWS_IMDS_VERSION_2;
+        }
 
+        /* Refresh token and retry request */
+        ret = refresh_ec2_token(ctx);
+        if (ret < 0) {
+            flb_debug("[imds] failed to refresh IMDSv2 token");
+            return -1;
+        }
+
+        flb_http_client_destroy(c);
+        token_header.val = ctx->imds_v2_token;
+        token_header.val_len = ctx->imds_v2_token_len;
+        flb_debug("[imds] refreshed IMDSv2 token");
+        c = ec2_imds_client->client_vtable->request(ec2_imds_client, FLB_HTTP_GET,
+                                       metadata_path, NULL, 0,
+                                       &token_header,
+                                       (imds_version == FLB_AWS_IMDS_VERSION_1) ? 0 : 1);
     }
 
     if (c->resp.status != 200) {
@@ -316,7 +334,7 @@ static int get_vpc_metadata(struct flb_aws_imds *ctx)
  * Get an IMDSv2 token
  * Token preserved in imds context
  */
-static int get_ec2_token(struct flb_aws_imds *ctx)
+static int refresh_ec2_token(struct flb_aws_imds *ctx)
 {
     struct flb_http_client *c = NULL;
     struct flb_aws_client *ec2_imds_client = ctx->ec2_imds_client;
@@ -342,6 +360,9 @@ static int get_ec2_token(struct flb_aws_imds *ctx)
     /* Preserve token information in ctx */
     if (c->resp.payload_size > 0) {
 
+        if (ctx->imds_v2_token) {
+            flb_sds_destroy(ctx->imds_v2_token);
+        }
         ctx->imds_v2_token = flb_sds_create_len(c->resp.payload,
                                                 c->resp.payload_size);
         if (!ctx->imds_v2_token) {
