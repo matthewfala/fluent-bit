@@ -108,7 +108,7 @@ struct flb_aws_imds {
 
 // Declarations
 /* Obtain the IMDS version */
-static int get_imds_version(struct flb_aws_imds *ctx, struct flb_aws_client *client);
+static int get_imds_version(struct flb_aws_imds *ctx);
 
 /* 
  * Create IMDS Context
@@ -196,7 +196,6 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
 {
     int ret;
     flb_sds_t tmp;
-    struct flb_upstream_conn *u_conn;
     
     struct flb_http_client *c = NULL;
 
@@ -204,7 +203,7 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
     struct flb_aws_header token_header = imds_v2_token_token_header_template;
 
     /* Get IMDS version */
-    int imds_version = get_imds_version(ctx, ec2_imds_client);
+    int imds_version = get_imds_version(ctx);
 
     /* Abort on version detection failure */
     if (imds_version == FLB_AWS_IMDS_VERSION_EVALUATE) {
@@ -237,13 +236,12 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
         } */
 
         /* Refresh token and retry request */
-        ret = refresh_ec2_token(ctx);
+        flb_http_client_destroy(c);
+        ret = refresh_imds_v2_token(ctx);
         if (ret < 0) {
             flb_debug("[imds] failed to refresh IMDSv2 token");
             return -1;
         }
-
-        flb_http_client_destroy(c);
         token_header.val = ctx->imds_v2_token;
         token_header.val_len = ctx->imds_v2_token_len;
         flb_debug("[imds] refreshed IMDSv2 token");
@@ -288,7 +286,8 @@ int flb_aws_imds_get_metadata_by_key(struct flb_aws_imds *ctx, char *metadata_pa
 }
 
 /* Obtain the IMDS version */
-static int get_imds_version(struct flb_aws_imds *ctx, struct flb_aws_client *client) {
+static int get_imds_version(struct flb_aws_imds *ctx) {
+    struct flb_aws_client *client = ctx->ec2_imds_client;
     struct flb_http_client *c = NULL;
 
     if (ctx->imds_version != FLB_AWS_IMDS_VERSION_EVALUATE) {
@@ -310,7 +309,7 @@ static int get_imds_version(struct flb_aws_imds *ctx, struct flb_aws_client *cli
     /* Unauthorized response means that IMDS version 2 is in use */
     if (c->resp.status == 401) {
         ctx->imds_version = FLB_AWS_IMDS_VERSION_2;
-        refresh_ec2_token(ctx);
+        refresh_imds_v2_token(ctx);
     }
 
     /* Success means that IMDS version 1 is in use
@@ -361,7 +360,7 @@ static int get_vpc_metadata(struct flb_aws_imds *ctx)
  * Get an IMDSv2 token
  * Token preserved in imds context
  */
-static int refresh_ec2_token(struct flb_aws_imds *ctx)
+static int refresh_imds_v2_token(struct flb_aws_imds *ctx)
 {
     struct flb_http_client *c = NULL;
     struct flb_aws_client *ec2_imds_client = ctx->ec2_imds_client;
