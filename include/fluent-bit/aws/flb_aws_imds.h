@@ -62,6 +62,7 @@ struct flb_aws_imds {
  * Create IMDS context
  * Returns NULL on error
  * Note: Setting the FLB_IO_ASYNC flag is the job of the client.
+ * flags &= ~(FLB_IO_ASYNC)
  */
 struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
                        struct flb_aws_imds_config *imds_config,

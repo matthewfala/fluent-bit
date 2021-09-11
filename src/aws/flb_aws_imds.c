@@ -25,15 +25,9 @@
 #include <fluent-bit/flb_jsmn.h>
 #include <fluent-bit/aws/flb_aws_imds.h>
 
-
 #define FLB_AWS_IMDS_HOST                                   "169.254.169.254"
 #define FLB_AWS_IMDS_ROOT                                   "/"
-
 #define FLB_AWS_IMDS_V2_TOKEN_PATH                          "/latest/api/token"
-
-#define FLB_AWS_IMDS_ROLE_PATH                              "/latest/meta-data/iam/security-credentials/"
-#define FLB_AWS_IMDS_ROLE_PATH_LEN                          43
-
 
 #define FLB_AWS_IMDS_INSTANCE_ID_PATH                       "/latest/meta-data/instance-id/"
 #define FLB_AWS_IMDS_AZ_PATH                                "/latest/meta-data/placement/availability-zone/"
@@ -71,7 +65,7 @@ static struct flb_aws_header imds_v2_token_ttl_header = {
 };
 
 /* Request header templates */
-static struct flb_aws_header imds_v2_token_token_header_template = {
+const static struct flb_aws_header imds_v2_token_token_header_template = {
     .key = "X-aws-ec2-metadata-token",
     .key_len = 24,
     .val = "",      // Replace with token value
@@ -89,7 +83,7 @@ const struct flb_aws_imds_config flb_aws_imds_config_default = {
 
 /* Create IMDS context */
 struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
-                       struct flb_aws_imds_config *imds_config, // FLB_AWS_IMDS_VERSION_EVALUATE for automatic detection
+                       struct flb_aws_imds_config *imds_config,
                        struct flb_aws_client *ec2_imds_client)
 {
     struct flb_aws_imds *ctx = NULL;
@@ -109,26 +103,16 @@ struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
     ctx->imds_v2_token = flb_sds_create_len("INVALID_TOKEN", 13);
 
     /* Detect IMDS support */
-    struct flb_upstream *ec2_upstream = flb_upstream_create(config,
-                                            FLB_AWS_IMDS_HOST,
-                                            80,
-                                            FLB_IO_TCP,
-                                            NULL);
-
-    if (!ec2_upstream) {
+    if (!ec2_imds_client->upstream) {
         flb_debug("[imds] unable to connect to EC2 IMDS on address %s",
-                  FLB_AWS_IMDS_HOST);
+                  ec2_imds_client->host);
 
         flb_free(ctx);
         return NULL;
     }
-    flb_upstream_destroy(ec2_upstream);
     
     /* Connect client */
     ctx->ec2_imds_client = ec2_imds_client;
-
-    /* Remove async flag from upstream */
-    // ctx->client->flags &= ~(FLB_IO_ASYNC); // TODO: Remove, if not needed. Async setting is the job of caller.
     return ctx;
 }
 
@@ -171,7 +155,7 @@ int flb_aws_imds_request_by_key(struct flb_aws_imds *ctx, char *metadata_path,
 
     /* Abort on version detection failure */
     if (imds_version == FLB_AWS_IMDS_VERSION_EVALUATE) {
-        // TODO: exit gracefully allowing for retrys
+        // Exit gracefully allowing for retrys
         flb_warn("[imds] unable to evaluate IMDS version");
         return -1;
     }
@@ -194,7 +178,8 @@ int flb_aws_imds_request_by_key(struct flb_aws_imds *ctx, char *metadata_path,
 
     /* Detect invalid token */
     if (imds_version == FLB_AWS_IMDS_VERSION_2 && c->resp.status == 401) {
-        /* TODO: Detect IMDS version requirement change */ // Can't test, so don't include
+        /* TODO: Detect IMDS version requirement change */
+        /* Currently unable to test the following */
         /* if (imds_version == FLB_AWS_IMDS_VERSION_1) {
             ctx->imds_version = FLB_AWS_IMDS_VERSION_2;
         } */
@@ -211,8 +196,7 @@ int flb_aws_imds_request_by_key(struct flb_aws_imds *ctx, char *metadata_path,
         flb_debug("[imds] refreshed IMDSv2 token");
         c = ec2_imds_client->client_vtable->request(ec2_imds_client, FLB_HTTP_GET,
                                        metadata_path, NULL, 0,
-                                       &token_header,
-                                       (imds_version == FLB_AWS_IMDS_VERSION_1) ? 0 : 1);
+                                       &token_header, 1);
     }
 
     if (c->resp.status != 200) {
@@ -258,13 +242,17 @@ static int get_imds_version(struct flb_aws_imds *ctx) {
         return ctx->imds_version;
     }
 
-    // Evaluate version (send an invalid token)
+    /* Evaluate version
+     * To evaluate wether IMDSv2 is available, send an invalid token
+     * in IMDS request. If response status is 'Unauthorized', then IMDSv2
+     * is available.
+     */
     struct flb_aws_header invalid_token_header = imds_v2_token_token_header_template;
     invalid_token_header.val = "INVALID";
     invalid_token_header.val_len = 7;
     c = client->client_vtable->request(client, FLB_HTTP_GET,
                                        FLB_AWS_IMDS_ROOT, NULL, 0,
-                                       &imds_v2_token_token_header_template, 1);
+                                       &invalid_token_header, 1);
     
     if (!c) {
         return FLB_AWS_IMDS_VERSION_EVALUATE;
