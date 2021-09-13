@@ -44,7 +44,7 @@ const static struct flb_aws_header imds_v2_token_token_header_template = {
     .val_len = 0,   // Replace with token length
 };
 
-// Declarations
+/* Declarations */
 static int get_imds_version(struct flb_aws_imds *ctx);
 static int refresh_imds_v2_token(struct flb_aws_imds *ctx);
 
@@ -214,6 +214,38 @@ int flb_aws_imds_request_by_key(struct flb_aws_imds *ctx, char *metadata_path,
     return 0;
 }
 
+/* Get VPC Id */
+flb_sds_t get_vpc_metadata(struct flb_aws_imds *ctx)
+{
+    int ret;
+    flb_sds_t mac_id = NULL;
+    size_t mac_len = 0;
+    flb_sds_t vpc_id = NULL;
+    size_t vpc_id_len = 0;
+
+    /* get EC2 instance Mac id first before getting VPC id */
+    ret = flb_aws_imds_request(ctx, FLB_AWS_IMDS_MAC_PATH, &mac_id, &mac_len);
+
+    if (ret < 0) {
+        flb_sds_destroy(mac_id);
+        return -1;
+    }
+
+    /* the VPC full path should be like:
+     * latest/meta-data/network/interfaces/macs/{mac_id}/vpc-id/"
+     */
+    flb_sds_t vpc_path = flb_sds_create_size(70);
+    vpc_path = flb_sds_printf(&vpc_path, "%s/%s/%s/",
+                              "/latest/meta-data/network/interfaces/macs",
+                              mac_id, "vpc-id");
+    ret = flb_aws_imds_request(ctx, vpc_path, &vpc_id, &vpc_id_len);
+
+    flb_sds_destroy(mac_id);
+    flb_sds_destroy(vpc_path);
+
+    return vpc_id;
+}
+
 /* Obtain the IMDS version */
 static int get_imds_version(struct flb_aws_imds *ctx) {
     struct flb_aws_client *client = ctx->ec2_imds_client;
@@ -254,42 +286,6 @@ static int get_imds_version(struct flb_aws_imds *ctx) {
 
     flb_http_client_destroy(c);
     return ctx->imds_version;
-}
-
-/* Get VPC id.
- * Utilizes two imds_requests
- * The first gets the Mac ID and combines it into the path for VPC.
- * The second uses the VPC path to get the VPC id
- */
-flb_sds_t get_vpc_metadata(struct flb_aws_imds *ctx)
-{
-    int ret;
-    flb_sds_t mac_id = NULL;
-    size_t mac_len = 0;
-    flb_sds_t vpc_id = NULL;
-    size_t vpc_id_len = 0;
-
-    /* get EC2 instance Mac id first before getting VPC id */
-    ret = flb_aws_imds_request(ctx, FLB_AWS_IMDS_MAC_PATH, &mac_id, &mac_len);
-
-    if (ret < 0) {
-        flb_sds_destroy(mac_id);
-        return -1;
-    }
-
-    /* the VPC full path should be like:
-     * latest/meta-data/network/interfaces/macs/{mac_id}/vpc-id/"
-     */
-    flb_sds_t vpc_path = flb_sds_create_size(70);
-    vpc_path = flb_sds_printf(&vpc_path, "%s/%s/%s/",
-                              "/latest/meta-data/network/interfaces/macs",
-                              mac_id, "vpc-id");
-    ret = flb_aws_imds_request(ctx, vpc_path, &vpc_id, &vpc_id_len);
-
-    flb_sds_destroy(mac_id);
-    flb_sds_destroy(vpc_path);
-
-    return vpc_id;
 }
 
 /*

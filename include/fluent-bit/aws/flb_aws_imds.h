@@ -102,6 +102,7 @@ int flb_aws_imds_request_by_key(struct flb_aws_imds *ctx, char *metadata_path,
 /*
  * Get VPC id from EC2 IMDS. Requires multiple IMDS requests.
  * Returns sds string encoding vpc_id.
+ * Note: Modified from AWS filter, not retested
  */
 flb_sds_t get_vpc_metadata(struct flb_aws_imds *ctx);
 
