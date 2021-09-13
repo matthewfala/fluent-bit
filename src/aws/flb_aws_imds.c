@@ -25,36 +25,8 @@
 #include <fluent-bit/flb_jsmn.h>
 #include <fluent-bit/aws/flb_aws_imds.h>
 
-#define FLB_AWS_IMDS_HOST                                   "169.254.169.254"
 #define FLB_AWS_IMDS_ROOT                                   "/"
 #define FLB_AWS_IMDS_V2_TOKEN_PATH                          "/latest/api/token"
-
-#define FLB_AWS_IMDS_INSTANCE_ID_PATH                       "/latest/meta-data/instance-id/"
-#define FLB_AWS_IMDS_AZ_PATH                                "/latest/meta-data/placement/availability-zone/"
-#define FLB_AWS_IMDS_INSTANCE_TYPE_PATH                     "/latest/meta-data/instance-type/"
-#define FLB_AWS_IMDS_PRIVATE_IP_PATH                        "/latest/meta-data/local-ipv4/"
-#define FLB_AWS_IMDS_VPC_ID_PATH_PREFIX                     "/latest/meta-data/network/interfaces/macs/"
-#define FLB_AWS_IMDS_AMI_ID_PATH                            "/latest/meta-data/ami-id/"
-#define FLB_AWS_IMDS_ACCOUNT_ID_PATH                        "/latest/dynamic/instance-identity/document/"
-#define FLB_AWS_IMDS_HOSTNAME_PATH                          "/latest/meta-data/hostname/"
-#define FLB_AWS_IMDS_MAC_PATH                               "/latest/meta-data/mac/"
-
-#define FLB_AWS_IMDS_AVAILABILITY_ZONE_KEY                  "az"
-#define FLB_AWS_IMDS_AVAILABILITY_ZONE_KEY_LEN              2
-#define FLB_AWS_IMDS_INSTANCE_ID_KEY                        "ec2_instance_id"
-#define FLB_AWS_IMDS_INSTANCE_ID_KEY_LEN                    15
-#define FLB_AWS_IMDS_INSTANCE_TYPE_KEY                      "ec2_instance_type"
-#define FLB_AWS_IMDS_INSTANCE_TYPE_KEY_LEN                  17
-#define FLB_AWS_IMDS_PRIVATE_IP_KEY                         "private_ip"
-#define FLB_AWS_IMDS_PRIVATE_IP_KEY_LEN                     10
-#define FLB_AWS_IMDS_VPC_ID_KEY                             "vpc_id"
-#define FLB_AWS_IMDS_VPC_ID_KEY_LEN                         6
-#define FLB_AWS_IMDS_AMI_ID_KEY                             "ami_id"
-#define FLB_AWS_IMDS_AMI_ID_KEY_LEN                         6
-#define FLB_AWS_IMDS_ACCOUNT_ID_KEY                         "account_id"
-#define FLB_AWS_IMDS_ACCOUNT_ID_KEY_LEN                     10
-#define FLB_AWS_IMDS_HOSTNAME_KEY                           "hostname"
-#define FLB_AWS_IMDS_HOSTNAME_KEY_LEN                       8
 
 /* Request headers */
 static struct flb_aws_header imds_v2_token_ttl_header = {
@@ -104,9 +76,22 @@ struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
 
     /* Detect IMDS support */
     if (!ec2_imds_client->upstream) {
-        flb_debug("[imds] unable to connect to EC2 IMDS on address %s",
-                  ec2_imds_client->host);
+        flb_debug("[imds] unable to connect to EC2 IMDS. ec2_imds_client upstream is null");
 
+        flb_free(ctx);
+        return NULL;
+    }
+    if (0 != strncmp(ec2_imds_client->upstream->tcp_host,
+                            FLB_AWS_IMDS_HOST,
+                            FLB_AWS_IMDS_HOST_LEN)) {
+        flb_debug("[imds] ec2_imds_client tcp host must be set to %s",
+                  FLB_AWS_IMDS_HOST);
+        flb_free(ctx);
+        return NULL;
+    }
+    if (ec2_imds_client->upstream->tcp_port != FLB_AWS_IMDS_PORT) {
+        flb_debug("[imds] ec2_imds_client tcp port must be set to %i",
+                  FLB_AWS_IMDS_PORT);
         flb_free(ctx);
         return NULL;
     }
@@ -120,10 +105,6 @@ struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
 void flb_aws_imds_destroy(struct flb_aws_imds *ctx) {
     if (ctx->imds_v2_token) {
         flb_sds_destroy(ctx->imds_v2_token);
-    }
-
-    if (ctx->vpc_id) {
-        flb_sds_destroy(ctx->vpc_id);
     }
 
     flb_free(ctx);
@@ -275,18 +256,21 @@ static int get_imds_version(struct flb_aws_imds *ctx) {
     return ctx->imds_version;
 }
 
-/* get VPC metadata, it called IMDS twice.
- * First is for getting the Mac ID and combine into the path for VPC.
- * Second call is using the VPC path to get the VPC id
+/* Get VPC id.
+ * Utilizes two imds_requests
+ * The first gets the Mac ID and combines it into the path for VPC.
+ * The second uses the VPC path to get the VPC id
  */
-static int get_vpc_metadata(struct flb_aws_imds *ctx)
+flb_sds_t get_vpc_metadata(struct flb_aws_imds *ctx)
 {
     int ret;
     flb_sds_t mac_id = NULL;
-    size_t len = 0;
+    size_t mac_len = 0;
+    flb_sds_t vpc_id = NULL;
+    size_t vpc_id_len = 0;
 
     /* get EC2 instance Mac id first before getting VPC id */
-    ret = flb_aws_imds_request(ctx, FLB_AWS_IMDS_MAC_PATH, &mac_id, &len);
+    ret = flb_aws_imds_request(ctx, FLB_AWS_IMDS_MAC_PATH, &mac_id, &mac_len);
 
     if (ret < 0) {
         flb_sds_destroy(mac_id);
@@ -294,18 +278,18 @@ static int get_vpc_metadata(struct flb_aws_imds *ctx)
     }
 
     /* the VPC full path should be like:
-     *latest/meta-data/network/interfaces/macs/{mac_id}/vpc-id/"
+     * latest/meta-data/network/interfaces/macs/{mac_id}/vpc-id/"
      */
     flb_sds_t vpc_path = flb_sds_create_size(70);
     vpc_path = flb_sds_printf(&vpc_path, "%s/%s/%s/",
                               "/latest/meta-data/network/interfaces/macs",
                               mac_id, "vpc-id");
-    ret = flb_aws_imds_request(ctx, vpc_path, &ctx->vpc_id, &ctx->vpc_id_len);
+    ret = flb_aws_imds_request(ctx, vpc_path, &vpc_id, &vpc_id_len);
 
     flb_sds_destroy(mac_id);
     flb_sds_destroy(vpc_path);
 
-    return ret;
+    return vpc_id;
 }
 
 /*

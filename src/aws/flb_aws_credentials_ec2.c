@@ -33,8 +33,6 @@
 #define AWS_IMDS_ROLE_PATH      "/latest/meta-data/iam/security-credentials/"
 #define AWS_IMDS_ROLE_PATH_LEN  43
 
-#define AWS_IMDS_HOST           "169.254.169.254"
-
 struct flb_aws_provider_ec2;
 static int get_creds_ec2(struct flb_aws_provider_ec2 *implementation);
 static int ec2_credentials_request(struct flb_aws_provider_ec2
@@ -242,7 +240,7 @@ struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
     provider->provider_vtable = &ec2_provider_vtable;
     provider->implementation = implementation;
 
-    upstream = flb_upstream_create(config, AWS_IMDS_HOST, 80,
+    upstream = flb_upstream_create(config, FLB_AWS_IMDS_HOST, FLB_AWS_IMDS_PORT,
                                    FLB_IO_TCP, NULL);
     if (!upstream) {
         flb_aws_provider_destroy(provider);

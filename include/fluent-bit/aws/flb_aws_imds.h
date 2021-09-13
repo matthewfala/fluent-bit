@@ -21,9 +21,25 @@
 #ifndef FLB_AWS_IMDS
 #define FLB_AWS_IMDS
 
+#define FLB_AWS_IMDS_HOST                                 "169.254.169.254"
+#define FLB_AWS_IMDS_HOST_LEN                             15
+#define FLB_AWS_IMDS_PORT                                 80
+
 #define FLB_AWS_IMDS_VERSION_EVALUATE                     0
 #define FLB_AWS_IMDS_VERSION_1                            1
 #define FLB_AWS_IMDS_VERSION_2                            2
+
+/* The following metadata paths can be evaluated with flb_aws_imds_request
+ * to retrieve specific metadata members */
+#define FLB_AWS_IMDS_INSTANCE_ID_PATH                       "/latest/meta-data/instance-id/"
+#define FLB_AWS_IMDS_AZ_PATH                                "/latest/meta-data/placement/availability-zone/"
+#define FLB_AWS_IMDS_INSTANCE_TYPE_PATH                     "/latest/meta-data/instance-type/"
+#define FLB_AWS_IMDS_PRIVATE_IP_PATH                        "/latest/meta-data/local-ipv4/"
+#define FLB_AWS_IMDS_VPC_ID_PATH_PREFIX                     "/latest/meta-data/network/interfaces/macs/"
+#define FLB_AWS_IMDS_AMI_ID_PATH                            "/latest/meta-data/ami-id/"
+#define FLB_AWS_IMDS_ACCOUNT_ID_PATH                        "/latest/dynamic/instance-identity/document/"
+#define FLB_AWS_IMDS_HOSTNAME_PATH                          "/latest/meta-data/hostname/"
+#define FLB_AWS_IMDS_MAC_PATH                               "/latest/meta-data/mac/"
 
 /* IMDS config values */
 struct flb_aws_imds_config {
@@ -38,10 +54,7 @@ struct flb_aws_imds {
     /* AWS Client to perform mockable requests to IMDS */
     struct flb_aws_client *ec2_imds_client;
 
-    /*
-     * IMDSv2 requires a token which must be present in metadata requests
-     * This plugin does not refresh the token
-     */
+    /* IMDSv2 requires a token which must be present in metadata requests */
     flb_sds_t imds_v2_token;
     size_t imds_v2_token_len;
 
@@ -51,18 +64,13 @@ struct flb_aws_imds {
      * the IMDS is used.
      */
     int imds_version;
-
-    /* EC2 Metadata fields to populate
-     */
-    flb_sds_t vpc_id;
-    size_t vpc_id_len;
 };
 
-/* 
+/*
  * Create IMDS context
  * Returns NULL on error
  * Note: Setting the FLB_IO_ASYNC flag is the job of the client.
- * flags &= ~(FLB_IO_ASYNC)
+ * Flag Set Example: flags &= ~(FLB_IO_ASYNC)
  */
 struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
                        struct flb_aws_imds_config *imds_config,
@@ -75,19 +83,26 @@ struct flb_aws_imds *flb_aws_imds_create(struct flb_config *config,
  */
 void flb_aws_imds_destroy(struct flb_aws_imds *ctx);
 
-/* 
+/*
  * Get IMDS metadata.
  */
 int flb_aws_imds_request(struct flb_aws_imds *ctx, char *metadata_path,
                         flb_sds_t *metadata, size_t *metadata_len);
 
-/* 
+/*
  * Get IMDS metadata by key
  * Expects metadata to be in a json object format.
  * Returns NULL if key not found.
- * If key is NULL, returns the full metadata value.
+ * Returns the full metadata value if key is NULL.
  */
 int flb_aws_imds_request_by_key(struct flb_aws_imds *ctx, char *metadata_path,
                         flb_sds_t *metadata, size_t *metadata_len, char *key);
+
+
+/*
+ * Get VPC id from EC2 IMDS. Requires multiple IMDS requests.
+ * Returns sds string encoding vpc_id.
+ */
+flb_sds_t get_vpc_metadata(struct flb_aws_imds *ctx);
 
 #endif
