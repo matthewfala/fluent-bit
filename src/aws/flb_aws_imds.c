@@ -90,6 +90,12 @@ struct flb_aws_imds *flb_aws_imds_create(const struct flb_aws_imds_config *imds_
         flb_aws_imds_destroy(ctx);
         return NULL;
     }
+    if (ec2_imds_client->upstream->net.connect_timeout != FLB_AWS_IMDS_TIMEOUT) {
+        flb_debug("[imds] ec2_imds_client timeout must be set to %i",
+                  FLB_AWS_IMDS_TIMEOUT);
+        flb_aws_imds_destroy(ctx);
+        return NULL;
+    }
 
     /* Connect client */
     ctx->ec2_imds_client = ec2_imds_client;
