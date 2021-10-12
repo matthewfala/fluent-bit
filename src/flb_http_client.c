@@ -1206,6 +1206,9 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
         r_bytes = flb_io_net_read(c->u_conn,
                                   c->resp.data + c->resp.data_len,
                                   available);
+        flb_warn("[http_client] made it past io net read for upstream host %s\n"
+                "Request: %s",
+                 c->u_conn->u->tcp_host, c->header_buf);
         if (r_bytes <= 0) {
             if (c->flags & FLB_HTTP_10) {
                 break;
