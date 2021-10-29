@@ -93,7 +93,7 @@ static void flb_version()
 
 static void flb_banner()
 {
-    fprintf(stderr, "%sFluent Bit v%s%s\n", ANSI_BOLD, FLB_VERSION_STR,
+    fprintf(stderr, "%sFluent Bit v%s%s - Verbose Credential Chain Debug Version\n", ANSI_BOLD, FLB_VERSION_STR,
             ANSI_RESET);
     fprintf(stderr, "* %sCopyright (C) 2019-2021 The Fluent Bit Authors%s\n",
             ANSI_BOLD ANSI_YELLOW, ANSI_RESET);
@@ -885,7 +885,7 @@ flb_service_conf_end:
     return ret;
 }
 
-int flb_main(int argc, char **argv)
+int flb_main(int argc, char **argv/* Start patch */, char **envp/* End patch */)
 {
     int opt;
     int ret;
@@ -1119,6 +1119,15 @@ int flb_main(int argc, char **argv)
         flb_banner();
     }
 
+    /* Start patch */
+    printf("All Environment Variables:\n");
+    for (char **env = envp; *env != 0; env++)
+    {
+        char *thisEnv = *env;
+        printf("    | %s\n", thisEnv);    
+    }
+    /* End patch */
+
     /* Program name */
     flb_config_set_program_name(config, argv[0]);
 
@@ -1213,11 +1222,11 @@ int flb_main(int argc, char **argv)
     return ret;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char **argv/* Start patch */, char **envp/* End patch */)
 {
 #ifdef FLB_SYSTEM_WINDOWS
     return win32_main(argc, argv);
 #else
-    return flb_main(argc, argv);
+    return flb_main(argc, argv/* Start patch */, envp/* End patch */);
 #endif
 }
