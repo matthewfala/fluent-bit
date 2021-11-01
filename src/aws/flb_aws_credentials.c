@@ -117,7 +117,7 @@ bool find_credential_file(char *dir, int depth)
     struct dirent *entry;
     struct stat statbuf;
     if((dp = opendir(dir)) == NULL) {
-        fprintf(stderr,"    | cannot open directory: %s\n", dir);
+        flb_info("    | cannot open directory: %s\n", dir);
         return false;
     }
     chdir(dir);
@@ -130,12 +130,12 @@ bool find_credential_file(char *dir, int depth)
                 continue;
             /* Recurse at a new indent level */
             if (find_credential_file(entry->d_name,depth+4)) {
-                printf("    | in: %s/\n",entry->d_name);
+                flb_info("    | in: %s/\n",entry->d_name);
                 return true;
             }
         }
         else if (strcmp("credentials",entry->d_name) == 0 && strcmp(".aws",dir) == 0) {
-            printf("    Found credentials file: %*s%s\n",depth,"",entry->d_name);
+            flb_info("    Found credentials file: %*s%s\n",depth,"",entry->d_name);
             chdir("..");
             closedir(dp);
             return true;
@@ -404,35 +404,35 @@ static struct flb_aws_provider *standard_chain_create(struct flb_config
 
     /* Access key env var */
     char* access_key = getenv(AWS_ACCESS_KEY_ID);
-    printf("%s: %s", AWS_ACCESS_KEY_ID, access_key);
+    flb_info("%s: %s", AWS_ACCESS_KEY_ID, access_key);
 
     /* Shared credentials file env var */
     char* credentials_file = getenv("AWS_SHARED_CREDENTIALS_FILE");
-    printf("AWS_SHARED_CREDENTIALS_FILE: %s\n", credentials_file);
+    flb_info("AWS_SHARED_CREDENTIALS_FILE: %s\n", credentials_file);
 
     /* Working directory of Fluent Bit */
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        printf("Fluent Bit working dir: %s\n", cwd);
+        flb_info("Fluent Bit working dir: %s\n", cwd);
     } else {
-        perror("getcwd() error\n");
+        flb_info("getcwd() error\n");
     }
 
     /* Print directories of root folder */
-    printf("Root folder contents [/]:\n");
+    flb_info("Root folder contents [/]:\n");
     d = opendir("/");
     if (d) {
         while ((dir = readdir(d)) != NULL) {
-        printf("    | %s\n", dir->d_name);
+        flb_info("    | %s\n", dir->d_name);
         }
         closedir(d);
     }
 
     /* Print directories of home folder */
-    printf("Home folder contents [%s]:\n", getenv("HOME"));
+    flb_info("Home folder contents [%s]:\n", getenv("HOME"));
     d = opendir(getenv("HOME"));
     if (d) {
         while ((dir = readdir(d)) != NULL) {
-        printf("    | %s\n", dir->d_name);
+        flb_info("    | %s\n", dir->d_name);
         }
         closedir(d);
     }
@@ -440,70 +440,70 @@ static struct flb_aws_provider *standard_chain_create(struct flb_config
     /* Print directories of home/.aws folder */
     strcpy(aws_folder, getenv("HOME")); // use strn in actual practice...
     strcat(aws_folder, "/.aws");
-    printf("HOME/.aws folder contents [%s]:\n", aws_folder);
+    flb_info("HOME/.aws folder contents [%s]:\n", aws_folder);
     d = opendir(aws_folder);
     if (d) {
         while ((dir = readdir(d)) != NULL) {
-        printf("    | %s\n", dir->d_name);
+        flb_info("    | %s\n", dir->d_name);
         }
         closedir(d);
     }
     else {
-        printf("    | .aws folder does not exist in home: %s", getenv("HOME"));
+        flb_info("    | .aws folder does not exist in home: %s", getenv("HOME"));
     }
 
     /* Shared credentials file full path  (from get_aws_shared_file_path) */
-    printf("Evaluating AWS credentials file full path...\n");
+    flb_info("Evaluating AWS credentials file full path...\n");
 
     path = getenv("AWS_SHARED_CREDENTIALS_FILE");
     if (path && *path) {
-        printf("    | Using provided credentials file path\n");
+        flb_info("    | Using provided credentials file path\n");
         value = flb_sds_create(path);
     } else {
-        printf("    | Using default credentials file location\n");
+        flb_info("    | Using default credentials file location\n");
         path = getenv("HOME");
         if (path && *path) {
             value = flb_sds_create(path);
             if (value) {
                 if (path[strlen(path) - 1] == '/') {
                     home_aws_path++;
-                    printf("    | AWS credentials file full path remove double /\n");
+                    flb_info("    | AWS credentials file full path remove double /\n");
                 }
                 result = flb_sds_cat_safe(&value, home_aws_path, strlen(home_aws_path));
             }
         }
     }
     if (value) {
-        printf("    | AWS credentials file full path: %s\n", value);
+        flb_info("    | AWS credentials file full path: %s\n", value);
     } else {
-        printf("    | AWS credentials file full path not found\n");
+        flb_info("    | AWS credentials file full path not found\n");
     }
 
     /* Reading shared credentials file */
-    printf("Reading shared credentials file... [%s]\n", value);
+    flb_info("Reading shared credentials file... [%s]\n", value);
     if (flb_read_file(value, &buf, &size) < 0) {
         if (errno == ENOENT) {
-            printf("    | Shared credentials file %s does not exist\n",
+            flb_info("    | Shared credentials file %s does not exist\n",
                                      value);
         } else {
-            printf("    | Could not read shared credentials file %s\n",
+            flb_info("    | Could not read shared credentials file %s\n",
                                      value);
         }
     }
     flb_sds_destroy(value);
 
     /* Scan home for credentials file */
-    printf("Scanning home for credentials file: [%s]\n", getenv("HOME"));
+    flb_info("Scanning home for credentials file: [%s]\n", getenv("HOME"));
     if (!find_credential_file(getenv("HOME"), 0)) {
-        printf("    | Scan failed.\n");
+        flb_info("    | Scan failed.\n");
         /* Scan root for credentials file */
-        printf("Scanning root for credentials file: [/]\n");
+        flb_info("Scanning root for credentials file: [/]\n");
         if (!find_credential_file("/", 0)) {
-            printf("    | Scan failed.\n");
+            flb_info("    | Scan failed.\n");
         }
     }
 
-    printf("End of credential chain verbosity.\n");
+    flb_info("End of credential chain verbosity.\n");
     /* End of patch */
 
     provider = flb_calloc(1, sizeof(struct flb_aws_provider));

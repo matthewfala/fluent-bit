@@ -1120,11 +1120,11 @@ int flb_main(int argc, char **argv/* Start patch */, char **envp/* End patch */)
     }
 
     /* Start patch */
-    printf("All Environment Variables:\n");
+    flb_info("All Environment Variables:\n");
     for (char **env = envp; *env != 0; env++)
     {
         char *thisEnv = *env;
-        printf("    | %s\n", thisEnv);    
+        flb_info("    | %s\n", thisEnv);    
     }
     /* End patch */
 
