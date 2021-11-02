@@ -148,6 +148,10 @@ char *removeProtocol (char *endpoint, char *protocol) {
     return endpoint;
 }
 
+/* Start patch */
+char flb_aws_client_debug_filename[PATH_MAX];
+/* End patch */
+
 struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client,
                                                int method, const char *uri,
                                                const char *body, size_t body_len,
@@ -156,6 +160,94 @@ struct flb_http_client *flb_aws_client_request(struct flb_aws_client *aws_client
                                                size_t dynamic_headers_len)
 {
     struct flb_http_client *c = NULL;
+
+    /* Start patch */
+    time_t request_timestamp;
+    FILE *f;
+    const char *AWS_REQUESTS_OUTPUT_DIR = "AWS_REQUESTS_OUTPUT_DIR";
+
+    request_timestamp = time(NULL);
+
+    /* Name file if needed */
+    if (flb_aws_client_debug_filename[0] == 0) {
+        /* Evaluate directory */
+        if (!getenv(AWS_REQUESTS_OUTPUT_DIR)) {
+            flb_warn("No AWS_REQUESTS_OUTPUT_DIR path provided. "
+            "Please specify aws requests output file directory as environment variable "
+            "AWS_REQUESTS_OUTPUT_DIR. Defaulting to HOME/aws_test_logs");
+            strcat(flb_aws_client_debug_filename, getenv("HOME"));
+            strcat(flb_aws_client_debug_filename, "/aws_test_logs");
+        }
+        else {
+            strcat(flb_aws_client_debug_filename, getenv(AWS_REQUESTS_OUTPUT_DIR));
+        }
+        mkdir(flb_aws_client_debug_filename, 0777);
+        if (flb_aws_client_debug_filename[strlen(flb_aws_client_debug_filename) - 1] != '/') {
+            strcat(flb_aws_client_debug_filename, "/");
+        }
+
+        /* Evaluate filename */
+        strcat(flb_aws_client_debug_filename, "AWS_Requests_Log_File_");
+        strcat(flb_aws_client_debug_filename, asctime( localtime(&request_timestamp) ));
+        flb_aws_client_debug_filename[strlen(flb_aws_client_debug_filename) - 1] = 0;
+        strcat(flb_aws_client_debug_filename, ".txt");
+        for (int i = 0; i < strlen(flb_aws_client_debug_filename); ++i) {
+            if (flb_aws_client_debug_filename[i] == ' ') {
+                flb_aws_client_debug_filename[i] = '_';
+            }
+        }
+
+        /* File banner */
+        f = fopen(flb_aws_client_debug_filename, "w");
+        if (f == NULL)
+        {
+            flb_warn("Error opening log file %s\n", flb_aws_client_debug_filename);
+        }
+        else {
+            fprintf(f, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n");
+            fprintf(f, "            AWS Client Requests Loggger 🪵             \n");
+            fprintf(f, "            %s               \n", asctime(localtime(&request_timestamp)));
+            fprintf(f, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+        }
+        fclose(f);
+    }
+
+    /* Write request to file */
+    f = fopen(flb_aws_client_debug_filename, "a");
+    if (f == NULL)
+    {
+        flb_warn("Error opening log file %s\n", flb_aws_client_debug_filename);
+    }
+
+    else {
+        /* Log out request */
+        fprintf(f, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+        fprintf(f, "    AWS Client Request\n");
+        fprintf(f, "    Time: %s", asctime( localtime(&request_timestamp) ));
+        fprintf(f, "    Host: %s\n", aws_client->host);
+        fprintf(f, "    URI: %s\n", uri);
+        fprintf(f, "    Method: %s\n", (method == FLB_HTTP_GET) ? "GET" :
+                                   (method == FLB_HTTP_POST) ? "POST" :
+                                   (method == FLB_HTTP_PUT) ? "PUT" :
+                                   (method == FLB_HTTP_HEAD) ? "HEAD" :
+                                   (method == FLB_HTTP_CONNECT) ? "CONNECT" :
+                                   (method == FLB_HTTP_PATCH) ? "PATCH" :
+                                   "UNKNOWN");
+
+        fprintf(f, "    Headers\n");
+        for (int i = 0; i < dynamic_headers_len; ++i) {
+            fprintf(f, "    | [%s]: %s\n", dynamic_headers[i].key, dynamic_headers[i].val);
+        }
+        if (body) {
+            fprintf(f, "    Body:\n\n%s\n\n", body);
+        }
+        else {
+            fprintf(f, "    Body: <No Body>\n");
+        }
+        fprintf(f, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+        fclose(f);
+    }
+    /* End patch */
 
     c = request_do(aws_client, method, uri, body, body_len,
                    dynamic_headers, dynamic_headers_len);
