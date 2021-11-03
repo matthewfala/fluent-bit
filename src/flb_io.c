@@ -291,16 +291,129 @@ static FLB_INLINE int net_io_write_async(struct flb_coro *co,
     return bytes;
 }
 
+static inline net_io_read_failure(struct flb_upstream_conn *u_conn,
+                                  struct mk_event_loop *sync_evl, char* reason) {
+    /* Generic error */
+    flb_warn("[net] io_read #%i failed from: %s:%i%s",
+                u_conn->fd, u_conn->u->tcp_host, u_conn->u->tcp_port, reason);
+    if (sync_evl) {
+        mk_event_loop_destroy(sync_evl);
+    }
+    flb_net_socket_blocking(u_conn->fd);
+}
+
 static ssize_t net_io_read(struct flb_upstream_conn *u_conn,
                            void *buf, size_t len)
 {
+    flb_pipefd_t fd;
+    struct mk_event_loop *sync_evl = NULL;
+    struct mk_event read_event;
+    struct mk_event timeout_event;
     int ret;
+    int mk_ret;
+
+    /* Set socket to non-blocking mode for timeout */
+    flb_net_socket_nonblocking(u_conn->fd);
+
+    /* Non blocking recv() with blocking mk_event_loop timeout */
+    ret = recv(u_conn->fd, buf, len, 0);
+    if (ret == -1) {
+        /*
+         * An asynchronous recv can return -1, but what is important is the
+         * socket status, getting a EWOULDBLOCK is expected, but any other case
+         * means a failure.
+         */
+        if (!FLB_WOULDBLOCK()) {
+            net_io_read_failure(u_conn, sync_evl, ", unknown recv error");
+            return -1;
+        }
+
+        /* Create mk event loop for sync event timeout */
+        sync_evl = mk_event_loop_create(2);
+        if (!sync_evl) {
+            net_io_read_failure(u_conn, sync_evl, ", mk_event_loop init failure");
+            return -1;
+        }
+
+        /* Create read event if recv() would block */
+        MK_EVENT_ZERO(&read_event);
+        mk_ret = mk_event_add(sync_evl,
+                            u_conn->fd,
+                            FLB_ENGINE_EV_THREAD,
+                            MK_EVENT_READ, &u_conn->event);
+        if (mk_ret == -1) {
+            net_io_read_failure(u_conn, sync_evl, ", mk_event error");
+            return -1;
+        }
+
+        /* Add timeout event to event_loop for early exit */
+        MK_EVENT_ZERO(&timeout_event); /* Create event timeout */
+        fd = mk_event_timeout_create(sync_evl, u_conn->u->net.connect_timeout, 0,
+                                    &timeout_event);
+        if (fd == -1) {
+            mk_event_del(sync_evl, )
+            net_io_read_failure(u_conn, sync_evl, ", mk_event error");
+            return -1;
+        }
+
+        /* Synchronous block with timeout */
+        mk_event_wait(sync_evl);
+
+        /* Get data */
+        ret = recv(u_conn->fd, buf, len, 0);
+    }
+    else if (ret < 0) {
+        /* Generic error */
+        flb_warn("[net] io_read #%i failed from: %s:%i",
+                u_conn->fd, u_conn->u->tcp_host, u_conn->u->tcp_port);
+        flb_socket_close(u_conn->fd);
+        flb_net_socket_blocking(u_conn->fd);
+        return -1;
+    }
+
+
+
+    /* Create event timeout */
+    MK_EVENT_ZERO(&timeout_event);
+    fd = mk_event_timeout_create(sync_evl, u_conn->u->net.connect_timeout, 0,
+                                &timeout_event);
+    if (fd == -1) {
+        mk_event_timeout_destroy(sync_evl, &timeout_event);
+        return -1;
+    }
+
+
+    sched->frame_fd = fd;
+
+
+
+
+    
+    
+    /* Create the event loop and set it in the global configuration */
+    if (!evl) {
+        return -1;
+    }
+
+    POLLIN  
+
+    MK_EVENT_READ
+
+    
+
+    mk_event_wait(evl);
+
 
     ret = recv(u_conn->fd, buf, len, 0);
     if (ret == -1) {
         return -1;
     }
 
+    /*
+     * The read succeeded, return the normal
+     * non-blocking mode to the socket.
+     */
+    flb_net_socket_blocking(u_conn->fd);
     return ret;
 }
 
