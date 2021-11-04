@@ -124,6 +124,31 @@ int flb_io_net_connect(struct flb_upstream_conn *u_conn,
     return 0;
 }
 
+/*
+ * Wait for connection via async:mk_event_loop or sync:poll(2) 
+ * Uses monkey event loop if async,
+ * Otherwise sync blocking wait.
+ * 
+ * currently timeout only supported for sync waits
+ * 
+ * If timeout_ms is -1, then there is no timeout.
+ * 
+ * u_conn->coro and u_conn->fd must be set.
+ * Return FLB_IO_WAIT_ERROR on failure
+ * Return FLB_IO_WAIT_TIMEOUT on timeout
+ * Return FLB_IO_WAIT_COMPLETE on complete
+ * 
+ * It is the responsability of the caller to set u_conn->coro is async
+ * 
+ * @param mask is an event types mask composed of MK_EVENT_<READ, WRITE, ...>
+ *  or the equivalent POLL<IN, OUT, ...>
+ */
+flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
+                           int timeout_ms)
+{
+    
+}
+
 static int net_io_write(struct flb_upstream_conn *u_conn,
                         const void *data, size_t len, size_t *out_len)
 {
