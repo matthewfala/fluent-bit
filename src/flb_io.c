@@ -201,8 +201,10 @@ flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
             return FLB_IO_WAIT_ERROR;
         }
 
-        /* Check if this is a timeout */
+        /* Check if resumed coro due to timeout */
         if (u_conn->net_error == ETIMEDOUT) {
+            /* reset net_error */
+            conn->net_error = -1;
             return FLB_IO_WAIT_TIMEDOUT;
         }
 
