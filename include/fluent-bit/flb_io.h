@@ -44,7 +44,7 @@
 
 /* IO Wait */
 #define FLB_IO_WAIT_ERROR      0
-#define FLB_IO_WAIT_TIMEOUT    1
+#define FLB_IO_WAIT_TIMEDOUT   1
 #define FLB_IO_WAIT_COMPLETE   2
 typedef int flb_io_wait_ret;
 
@@ -69,8 +69,8 @@ int flb_io_net_connect(struct flb_upstream_conn *u_conn,
  * 
  * @param co may be set to null if sync
  * 
- * @param mask is an event types mask composed of MK_EVENT_<READ, WRITE, ...>
- *  or the equivalent POLL<IN, OUT, ...>
+ * @param mask is an event types mask composed of MK_EVENT_<READ, WRITE>
+ *  or the equivalent POLL<IN, OUT>
  */
 flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
                            struct flb_coro *co);

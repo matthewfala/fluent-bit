@@ -144,9 +144,70 @@ int flb_io_net_connect(struct flb_upstream_conn *u_conn,
  *  or the equivalent POLL<IN, OUT, ...>
  */
 flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
-                           int timeout_ms)
+                           struct flb_coro *co)
 {
-    
+    int ret;
+    uint32_t result_mask;
+
+    if (u_conn->u->flags & FLB_IO_ASYNC) {
+
+        /* If async, co must not be null */
+        flb_bug(co != NULL);
+
+        ret = mk_event_add(u_conn->evl,
+                               u_conn->fd,
+                               FLB_ENGINE_EV_THREAD,
+                               mask, &u_conn->event);
+        if (ret == -1) {
+            /*
+             * If we failed here there no much that we can do, just
+             * let the caller we failed
+             */
+            return -1;
+        }
+
+        u_conn->coro = co;
+
+        /*
+         * Return the control to the parent caller, we need to wait for
+         * the event loop to get back to us.
+         */
+        flb_coro_yield(co, FLB_FALSE);
+
+        /* We want this field to hold NULL at all times unless we are explicitly
+         * waiting to be resumed.
+         */
+        u_conn->coro = NULL;
+
+        /* Save events mask since mk_event_del() will reset it */
+        result_mask = u_conn->event.mask;
+
+            /* Remove the registered event */
+            ret = mk_event_del(u_conn->evl, &u_conn->event);
+            if (ret == -1) {
+                return -1;
+            }
+            MK_EVENT_NEW(&u_conn->event);
+
+        /* Check event status */
+        /* Not yet apparent what could change the event status mask */
+        if (mask & MK_EVENT_READ && !(result_mask & MK_EVENT_READ)) {
+            /* cleanup? */
+            return FLB_IO_WAIT_ERROR;
+        }
+
+        if (mask & MK_EVENT_READ && !(result_mask & MK_EVENT_WRITE)) {
+            /* cleanup? */
+            return FLB_IO_WAIT_ERROR;
+        }
+
+        /* Check if this is a timeout */
+        if (u_conn->net_error == ETIMEDOUT) {
+            return FLB_IO_WAIT_TIMEDOUT;
+        }
+
+        return FLB_IO_WAIT_COMPLETE;
+    }
 }
 
 static int net_io_write(struct flb_upstream_conn *u_conn,
