@@ -368,8 +368,8 @@ int flb_tls_session_create(struct flb_tls *tls,
 
             /* Connect timeout */
             if (u->net.connect_timeout > 0 &&
-                u_conn->ts_connect_timeout > 0 &&
-                u_conn->ts_connect_timeout <= time(NULL)) {
+                u_conn->ts_timeout > 0 &&
+                u_conn->ts_timeout <= time(NULL)) {
                 flb_error("[io_tls] handshake connection #%i to %s:%i timed out after "
                           "%i seconds",
                           u_conn->fd,

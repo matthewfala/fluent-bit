@@ -29,6 +29,11 @@
 #include <mbedtls/net.h>
 #endif
 
+#define FLB_TIMEOUT_SUBJECT_NULL          0
+#define FLB_TIMEOUT_SUBJECT_CONNECT       1
+#define FLB_TIMEOUT_SUBJECT_RESPONSE      2
+typedef int flb_timeout_subject;
+
 /* Upstream TCP connection */
 struct flb_upstream_conn {
     struct mk_event event;
@@ -71,7 +76,8 @@ struct flb_upstream_conn {
 
     /* Connect */
     time_t ts_connect_start;
-    time_t ts_connect_timeout;
+    time_t ts_timeout;
+    flb_timeout_subject ts_timeout_subject;
 
     /* Event loop */
     struct mk_event_loop *evl;
