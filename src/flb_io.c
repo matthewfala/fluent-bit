@@ -149,66 +149,70 @@ flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
     int ret;
     uint32_t result_mask;
 
+    /* Asynchronous wait */
     if (u_conn->u->flags & FLB_IO_ASYNC) {
-
         /* If async, co must not be null */
         flb_bug(co != NULL);
 
+        /* Add new monkey event to event loop */
         ret = mk_event_add(u_conn->evl,
                                u_conn->fd,
                                FLB_ENGINE_EV_THREAD,
                                mask, &u_conn->event);
         if (ret == -1) {
             /*
-             * If we failed here there no much that we can do, just
-             * let the caller we failed
+             * Failed to add the monkey event.
+             * let the caller know we failed
              */
-            return -1;
+            return FLB_IO_WAIT_ERROR;
         }
-
-        u_conn->coro = co;
 
         /*
          * Return the control to the parent caller, we need to wait for
          * the event loop to get back to us.
-         */
-        flb_coro_yield(co, FLB_FALSE);
-
-        /* We want this field to hold NULL at all times unless we are explicitly
+         * 
+         * u_conn->coro should hold NULL at all times unless we are explicitly
          * waiting to be resumed.
          */
+        u_conn->coro = co;
+        flb_coro_yield(co, FLB_FALSE);
         u_conn->coro = NULL;
 
-        /* Save events mask since mk_event_del() will reset it */
+        /* 
+         * Async wait complete, and thread resumed. Remove the registered
+         * event
+         */
         result_mask = u_conn->event.mask;
-
-            /* Remove the registered event */
-            ret = mk_event_del(u_conn->evl, &u_conn->event);
-            if (ret == -1) {
-                return -1;
-            }
-            MK_EVENT_NEW(&u_conn->event);
+        ret = mk_event_del(u_conn->evl, &u_conn->event);
+        if (ret == -1) {
+            return -1;
+        }
+        MK_EVENT_NEW(&u_conn->event);
 
         /* Check event status */
-        /* Not yet apparent what could change the event status mask */
+        /* TODO: Not yet apparent what mk_event op could change the event status mask */
         if (mask & MK_EVENT_READ && !(result_mask & MK_EVENT_READ)) {
-            /* cleanup? */
+            u_conn->net_error = -1;
             return FLB_IO_WAIT_ERROR;
         }
-
         if (mask & MK_EVENT_READ && !(result_mask & MK_EVENT_WRITE)) {
-            /* cleanup? */
+            u_conn->net_error = -1;
             return FLB_IO_WAIT_ERROR;
         }
 
         /* Check if resumed coro due to timeout */
         if (u_conn->net_error == ETIMEDOUT) {
-            /* reset net_error */
-            conn->net_error = -1;
+            u_conn->net_error = -1; /* reset net_error */
             return FLB_IO_WAIT_TIMEDOUT;
         }
 
         return FLB_IO_WAIT_COMPLETE;
+    }
+
+    /* Synchronous wait */
+    else {
+
+
     }
 }
 
