@@ -138,6 +138,10 @@ int flb_io_net_connect(struct flb_upstream_conn *u_conn,
  * Return FLB_IO_WAIT_TIMEOUT on timeout
  * Return FLB_IO_WAIT_COMPLETE on complete
  * 
+ * For synchronous waits, the u_conn socket file descriptor must be set to nonblocking
+ *  flb_net_socket_nonblocking(u_conn->fd);
+ *  flb_net_socket_blocking(u_conn->fd);
+ * 
  * It is the responsability of the caller to set u_conn->coro is async
  * 
  * @param mask is an event types mask composed of MK_EVENT_<READ, WRITE, ...>
@@ -148,11 +152,20 @@ flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
 {
     int ret;
     uint32_t result_mask;
+    struct pollfd pfd_read;
+    time_t now;
 
-    /* Asynchronous wait */
+    /* To wait, MK_EVENT_READ or MK_EVENT_WRITE must included in event mask */
+    flb_bug(!(mask & MK_EVENT_READ) && !(mask & MK_EVENT_WRITE));
+    int now = TIME(NULL);
+
+    /* Asynchronous event loop wait */
     if (u_conn->u->flags & FLB_IO_ASYNC) {
         /* If async, co must not be null */
         flb_bug(co != NULL);
+
+        /* Set event loop timeout */
+        
 
         /* Add new monkey event to event loop */
         ret = mk_event_add(u_conn->evl,
@@ -160,10 +173,7 @@ flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
                                FLB_ENGINE_EV_THREAD,
                                mask, &u_conn->event);
         if (ret == -1) {
-            /*
-             * Failed to add the monkey event.
-             * let the caller know we failed
-             */
+            /* Monkey event creation error */
             return FLB_IO_WAIT_ERROR;
         }
 
@@ -185,14 +195,15 @@ flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
         result_mask = u_conn->event.mask;
         ret = mk_event_del(u_conn->evl, &u_conn->event);
         if (ret == -1) {
-            return -1;
+            flb_error("[io fd=%i] error deleting monkey event", u_conn->fd);
+            return FLB_IO_WAIT_ERROR;
         }
         MK_EVENT_NEW(&u_conn->event);
 
         /* Check event status */
         /* TODO: Not yet apparent what mk_event op could change the event status mask */
         if (mask & MK_EVENT_READ && !(result_mask & MK_EVENT_READ)) {
-            u_conn->net_error = -1;
+            u_conn->net_error = -1;  /* reset net_error */
             return FLB_IO_WAIT_ERROR;
         }
         if (mask & MK_EVENT_READ && !(result_mask & MK_EVENT_WRITE)) {
@@ -202,17 +213,34 @@ flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
 
         /* Check if resumed coro due to timeout */
         if (u_conn->net_error == ETIMEDOUT) {
-            u_conn->net_error = -1; /* reset net_error */
+            u_conn->net_error = -1;  /* reset net_error */
             return FLB_IO_WAIT_TIMEDOUT;
         }
 
         return FLB_IO_WAIT_COMPLETE;
     }
 
-    /* Synchronous wait */
+    /* Synchronous blocking wait */
     else {
+        if (mask & MK_EVENT_READ) {
+            pfd_read.events |= POLLIN;
+        }
+        if (mask & MK_EVENT_WRITE) {
+            pfd_read.events |= POLLOUT;
+        }
 
+        pfd_read.fd = u_conn->fd;
+        ret = poll(&pfd_read, 1, u_conn->ts_timeout * 1000);
+        if (ret == 0) {
+            /* Timeout */
+            return FLB_IO_WAIT_TIMEDOUT;
+        }
+        else if (ret < 0) {
+            /* Generic poll error */
+            return FLB_IO_WAIT_ERROR;
+        }
 
+        return FLB_IO_WAIT_COMPLETE;
     }
 }
 
