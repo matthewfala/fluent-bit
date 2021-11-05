@@ -42,8 +42,38 @@
 /* Other features */
 #define FLB_IO_IPV6       32  /* network I/O uses IPv6                  */
 
+/* IO Wait */
+#define FLB_IO_WAIT_ERROR      0
+#define FLB_IO_WAIT_TIMEDOUT   1
+#define FLB_IO_WAIT_COMPLETE   2
+typedef int flb_io_wait_ret;
+
 int flb_io_net_connect(struct flb_upstream_conn *u_conn,
                        struct flb_coro *th);
+
+/*
+ * Wait for connection via async:mk_event_loop or sync:poll(2)
+ * Uses monkey event loop if async,
+ * Otherwise sync blocking wait.
+ * 
+ * currently timeout only supported for sync waits
+ * 
+ * If timeout_ms is -1, then there is no timeout.
+ * 
+ * u_conn->coro and u_conn->fd must be set.
+ * Return FLB_IO_WAIT_ERROR on failure
+ * Return FLB_IO_WAIT_TIMEOUT on timeout
+ * Return FLB_IO_WAIT_COMPLETE on complete
+ * 
+ * It is the responsability of the caller to set u_conn->coro is async
+ * 
+ * @param co may be set to null if sync
+ * 
+ * @param mask is an event types mask composed of MK_EVENT_<READ, WRITE>
+ *  or the equivalent POLL<IN, OUT>
+ */
+flb_io_wait_ret flb_io_wait(struct flb_upstream_conn *u_conn, uint32_t mask,
+                           struct flb_coro *co);
 
 int flb_io_net_write(struct flb_upstream_conn *u, const void *data,
                      size_t len, size_t *out_len);

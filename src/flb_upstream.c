@@ -488,10 +488,12 @@ static struct flb_upstream_conn *create_conn(struct flb_upstream *u)
     conn->evl = evl;
 
     if (u->net.connect_timeout > 0) {
-        conn->ts_connect_timeout = now + u->net.connect_timeout;
+        conn->ts_timeout_subject = FLB_TIMEOUT_SUBJECT_CONNECT;
+        conn->ts_timeout = now + u->net.connect_timeout;
     }
     else {
-        conn->ts_connect_timeout = -1;
+        conn->ts_timeout_subject = NULL;
+        conn->ts_timeout = -1;
     }
 
 #ifdef FLB_HAVE_TLS
@@ -541,7 +543,8 @@ static struct flb_upstream_conn *create_conn(struct flb_upstream *u)
     }
 
     /* Invalidate timeout for connection */
-    conn->ts_connect_timeout = -1;
+    conn->ts_timeout_subject = NULL;
+    conn->ts_timeout = -1;
     conn->busy_flag = FLB_FALSE;
 
     return conn;
@@ -762,6 +765,7 @@ int flb_upstream_conn_timeouts(struct mk_list *list)
 {
     time_t now;
     int drop;
+    int resume;
     struct mk_list *head;
     struct mk_list *u_head;
     struct mk_list *tmp;
@@ -785,16 +789,29 @@ int flb_upstream_conn_timeouts(struct mk_list *list)
             u_conn = mk_list_entry(u_head, struct flb_upstream_conn, _head);
 
             drop = FLB_FALSE;
+            resume = FLB_FALSE;
 
-            /* Connect timeouts */
-            if (u->net.connect_timeout > 0 &&
-                u_conn->ts_connect_timeout > 0 &&
-                u_conn->ts_connect_timeout <= now) {
-                drop = FLB_TRUE;
-                flb_error("[upstream] connection #%i to %s:%i timed out after "
-                          "%i seconds",
-                          u_conn->fd,
-                          u->tcp_host, u->tcp_port, u->net.connect_timeout);
+            /* All connection timeouts */
+            if (u_conn->ts_timeout > 0 &&
+                u_conn->ts_timeout <= now) {
+                
+                /* timeout triggers a coro resume & raises net_error ETIMEDOUT */
+                u_conn->net_error = ETIMEDOUT;
+                resume = FLB_TRUE;
+
+                if (u_conn->ts_timeout_subject == FLB_TIMEOUT_SUBJECT_CONNECT) {
+                    drop = FLB_TRUE;
+                    flb_error("[upstream] connection #%i to %s:%i timed out after "
+                            "%i seconds",
+                            u_conn->fd,
+                            u->tcp_host, u->tcp_port, u->net.connect_timeout);
+                }
+                else if (u_conn->ts_timeout_subject == FLB_TIMEOUT_SUBJECT_RESPONSE) {
+                    flb_error("[upstream] connection #%i response to %s:%i timed out "
+                            "after %i seconds",
+                            u_conn->fd,
+                            u->tcp_host, u->tcp_port, u->net.response_timeout);
+                }
             }
 
             if (drop == FLB_TRUE) {
@@ -808,9 +825,10 @@ int flb_upstream_conn_timeouts(struct mk_list *list)
                     shutdown(u_conn->fd, SHUT_RDWR);
                 }
 
-                u_conn->net_error = ETIMEDOUT;
                 prepare_destroy_conn(u_conn);
+            }
 
+            if (resume == FLB_TRUE) {
                 /*
                  * If the connection has its coro field set it means it's waiting for a
                  * FLB_ENGINE_EV_THREAD event which in some specific cases might never
