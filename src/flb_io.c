@@ -130,22 +130,24 @@ int flb_io_net_connect(struct flb_upstream_conn *u_conn,
  */
 static flb_io_wait_ret flb_io_wait_sync(struct flb_upstream_conn *u_conn, uint32_t mask,
                                         int timeout) {
-    struct pollfd pfd_read;
+    struct pollfd pfd;
     int ret;
 
     /* To wait, MK_EVENT_READ or MK_EVENT_WRITE must included in event mask */
     if(!(mask & MK_EVENT_READ) && !(mask & MK_EVENT_WRITE)) {
         flb_error("[io] mask must include MK_EVENT_READ or MK_EVENT_WRITE");
+        return FLB_IO_WAIT_ERROR;
     }
+    pfd.events = 0;
     if (mask & MK_EVENT_READ) {
-        pfd_read.events |= POLLIN;
+        pfd.events |= POLLIN;
     }
     if (mask & MK_EVENT_WRITE) {
-        pfd_read.events |= POLLOUT;
+        pfd.events |= POLLOUT;
     }
 
-    pfd_read.fd = u_conn->fd;
-    ret = poll(&pfd_read, 1, timeout);
+    pfd.fd = u_conn->fd;
+    ret = poll(&pfd, 1, timeout);
     if (ret == 0) {
         /* Timeout */
         return FLB_IO_WAIT_TIMEDOUT;
@@ -385,13 +387,15 @@ static ssize_t net_io_read(struct flb_upstream_conn *u_conn,
                       "%s:%i",
                       u_conn->fd, u_conn->u->net.io_timeout,
                       u_conn->u->tcp_host, u_conn->u->tcp_port);
+            flb_socket_close(u_conn->fd);
             flb_net_socket_blocking(u_conn->fd);
-            return -1; /* differ closing socket to caller */
+            return -1;
         }
         else if (io_wait_ret == FLB_IO_WAIT_ERROR) {
             /* Generic error */
             flb_warn("[net] io_read #%i failed from: %s:%i",
                       u_conn->fd, u_conn->u->tcp_host, u_conn->u->tcp_port);
+            flb_socket_close(u_conn->fd);
             flb_net_socket_blocking(u_conn->fd);
             return -1;
         }
