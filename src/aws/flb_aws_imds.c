@@ -269,22 +269,30 @@ static int get_imds_version(struct flb_aws_imds *ctx)
         ctx->imds_version = FLB_AWS_IMDS_VERSION_2;
         ret = refresh_imds_v2_token(ctx);
         if (ret == -1) {
-            /* Token cannot be refreshed, test IMDSv1 */
-            flb_warn("[imds] failed to retrieve IMDSv2 token. "
-                     "This is most likely due to instance-metadata-options "
-                     "--http-put-response-hop-limit misconfigured to 1 when Fluent Bit "
-                     "is running within a container. "
-                     "To use IMDSv2, please set --http-put-response-hop-limit to 2 as "
-                     "described https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/"
-                     "configuring-instance-metadata-options.html");
-
-            /* Test if IMDSv1 can be used. If not, response will be status 401 */
+            /*
+             * Token cannot be refreshed, test IMDSv1
+             * If IMDSv1 cannot be used, response will be status 401
+             */
             flb_http_client_destroy(c);
             ctx->imds_version = FLB_AWS_IMDS_VERSION_EVALUATE;
             c = client->client_vtable->request(client, FLB_HTTP_GET, FLB_AWS_IMDS_ROOT,
                                                NULL, 0, NULL, 0);
             if (!c) {
                 return FLB_AWS_IMDS_VERSION_EVALUATE;
+            }
+
+            if (c->resp.status == 200) {
+                flb_info("[imds] to use IMDSv2, set --http-put-response-limit to 2");
+            }
+            else {
+                /* IMDSv1 unavailable. IMDSv2 beyond network hop count */
+                flb_warn("[imds] failed to retrieve IMDSv2 token and IMDSv1 unavailable. "
+                        "This is likely due to instance-metadata-options "
+                        "--http-put-response-hop-limit being set to 1 and --http-tokens "
+                        "set to required. "
+                        "To use IMDSv2, please set --http-put-response-hop-limit to 2 as "
+                        "described https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/"
+                        "configuring-instance-metadata-options.html");
             }
         }
     }
@@ -294,6 +302,7 @@ static int get_imds_version(struct flb_aws_imds *ctx)
      * (Not Tested, TODO: Must test this on an instance without IMDSv2)
      */
     if (c->resp.status == 200) {
+        flb_info("[imds] falling back on IMDSv1");
         ctx->imds_version = FLB_AWS_IMDS_VERSION_1;
     }
 
