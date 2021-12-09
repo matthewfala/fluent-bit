@@ -236,6 +236,7 @@ struct flb_config {
     void *sched;
     unsigned int sched_cap;
     unsigned int sched_base;
+    uint64_t cb_timer_event_timestamp;
 
     struct flb_task_map tasks_map[2048];
 

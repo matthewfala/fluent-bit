@@ -55,7 +55,7 @@ static void cb_thread_sched_timer(struct flb_config *ctx, void *data)
 
     /* Upstream connections timeouts handling */
     ins = (struct flb_output_instance *) data;
-    flb_upstream_conn_timeouts(&ins->upstreams);
+    flb_upstream_conn_timeouts(SIZE_MAX, &ins->upstreams);
 }
 
 static inline int handle_output_event(struct flb_config *config,

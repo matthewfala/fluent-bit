@@ -762,7 +762,7 @@ int flb_upstream_conn_release(struct flb_upstream_conn *conn)
     return prepare_destroy_conn_safe(conn);
 }
 
-int flb_upstream_conn_timeouts(struct mk_list *list)
+int flb_upstream_conn_timeouts(uint64_t cb_schedule_timestamp, struct mk_list *list)
 {
     time_t now;
     int drop;
@@ -772,6 +772,7 @@ int flb_upstream_conn_timeouts(struct mk_list *list)
     struct flb_upstream *u;
     struct flb_upstream_conn *u_conn;
     struct flb_upstream_queue *uq;
+    uint64_t ts_connect_timeout_ns;
 
     now = time(NULL);
 
@@ -791,9 +792,11 @@ int flb_upstream_conn_timeouts(struct mk_list *list)
             drop = FLB_FALSE;
 
             /* Connect timeouts */
+            ts_connect_timeout_ns = (uint64_t)1000000000 * u_conn->ts_connect_timeout;
             if (u->net.connect_timeout > 0 &&
                 u_conn->ts_connect_timeout > 0 &&
-                u_conn->ts_connect_timeout <= now) {
+                u_conn->ts_connect_timeout <= now &&
+                ts_connect_timeout_ns < cb_schedule_timestamp) {
                 drop = FLB_TRUE;
 
                 if (!flb_upstream_is_shutting_down(u)) {

@@ -61,6 +61,8 @@
 extern struct flb_aws_error_reporter *error_reporter;
 #endif
 
+#define FLB_CB_ENGINE_SCHED_INTERVAL 1500
+
 FLB_TLS_DEFINE(struct mk_event_loop, flb_engine_evl);
 
 
@@ -124,7 +126,10 @@ static void cb_engine_sched_timer(struct flb_config *ctx, void *data)
     (void) data;
 
     /* Upstream connections timeouts handling */
-    flb_upstream_conn_timeouts(&ctx->upstreams);
+    flb_upstream_conn_timeouts(ctx->cb_timer_event_timestamp, &ctx->upstreams);
+
+    /* Update cb_timer_event_timestamp to reflect when the next cb will be scheduled */
+    ctx->cb_timer_event_timestamp += FLB_CB_ENGINE_SCHED_INTERVAL;
 }
 
 static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
@@ -672,7 +677,9 @@ int flb_engine_start(struct flb_config *config)
      */
     ret = flb_sched_timer_cb_create(config->sched,
                                     FLB_SCHED_TIMER_CB_PERM,
-                                    1500, cb_engine_sched_timer, config, NULL);
+                                    FLB_CB_ENGINE_SCHED_INTERVAL,
+                                    cb_engine_sched_timer, config, NULL);
+    config->cb_timer_event_timestamp = cmt_time_now() + FLB_CB_ENGINE_SCHED_INTERVAL;
     if (ret == -1) {
         flb_error("[engine] could not schedule permanent callback");
         return -1;
