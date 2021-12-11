@@ -169,6 +169,12 @@ int mk_event_wait(struct mk_event_loop *loop)
     return _mk_event_wait(loop);
 }
 
+/* Poll events with timeout */
+int mk_event_wait_2(struct mk_event_loop *loop, int timeout)
+{
+    return _mk_event_wait_2(loop, timeout);
+}
+
 /* Return the backend name */
 char *mk_event_backend()
 {

@@ -139,6 +139,7 @@ int mk_event_timeout_destroy(struct mk_event_loop *loop, void *data);
 int mk_event_channel_create(struct mk_event_loop *loop,
                             int *r_fd, int *w_fd, void *data);
 int mk_event_wait(struct mk_event_loop *loop);
+int mk_event_wait_2(struct mk_event_loop *loop, int timeout);
 int mk_event_translate(struct mk_event_loop *loop);
 char *mk_event_backend();
 struct mk_event_fdt *mk_event_get_fdt();
@@ -157,22 +158,21 @@ static inline void mk_event_load_bucket_queue(struct mk_event *event,
     for (                                                                               \
         /* init */                                                                      \
         __mk_event_priority_live_foreach_iter = 0,                                      \
-        mk_event_wait(evl),                                                             \
         mk_event_load_bucket_queue(event, bktq, evl),                                   \
         event = mk_list_entry(                                                          \
                     mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head);   \
                                                                                         \
         /* condition */                                                                 \
         !mk_bucket_queue_is_empty(bktq) &&                                              \
-        (__mk_event_priority_live_foreach_iter < max_iter || max_iter == -1)            \
+        (__mk_event_priority_live_foreach_iter < max_iter || max_iter == -1);           \
                                                                                         \
         /* update */                                                                    \
         ++__mk_event_priority_live_foreach_iter,                                        \
         mk_bucket_queue_delete_min(bktq),                                               \
-        mk_event_wait(evl), /* change to non blocking */                                \
+        mk_event_wait_2(evl, 0), /* change to non blocking */                              \
         mk_event_load_bucket_queue(event, bktq, evl),                                   \
         event = mk_list_entry(                                                          \
-                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head)    \                                                                     \
+                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head)    \
     )
 
 #endif

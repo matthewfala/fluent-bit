@@ -367,6 +367,15 @@ static inline int _mk_event_wait(struct mk_event_loop *loop)
     return loop->n_events;
 }
 
+static inline int _mk_event_wait_2(struct mk_event_loop *loop, int timeout)
+{
+    struct mk_event_ctx *ctx = loop->data;
+
+    loop->n_events = epoll_wait(ctx->efd, ctx->events, ctx->queue_size, timeout);
+    return loop->n_events;
+}
+
+
 static inline char *_mk_event_backend()
 {
     return "epoll";

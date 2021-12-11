@@ -22,6 +22,7 @@
 #include <stdlib.h>
 
 #include <monkey/mk_core.h>
+#include <monkey/mk_core/mk_bucket_queue.h>
 #include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_bits.h>
@@ -505,6 +506,7 @@ int flb_engine_start(struct flb_config *config)
     struct flb_time t_flush;
     struct mk_event *event;
     struct mk_event_loop *evl;
+    struct mk_bucket_queue *evl_bktq;
     struct flb_sched *sched;
     struct flb_net_dns dns_ctx;
 
@@ -521,6 +523,9 @@ int flb_engine_start(struct flb_config *config)
         return -1;
     }
     config->evl = evl;
+
+    /* Create the bucket queue (8 priorities) */
+    evl_bktq = mk_bucket_queue_create(8);
 
     /* Register the event loop on this thread */
     flb_engine_evl_init();
@@ -691,7 +696,7 @@ int flb_engine_start(struct flb_config *config)
 
     while (1) {
         mk_event_wait(evl);
-        mk_event_foreach(event, evl) {
+        mk_event_priority_live_foreach(event, evl_bktq, evl, 100) { /* 100 max events */
             if (event->type == FLB_ENGINE_EV_CORE) {
                 ret = flb_engine_handle_event(event->fd, event->mask, config);
                 if (ret == FLB_ENGINE_STOP) {
