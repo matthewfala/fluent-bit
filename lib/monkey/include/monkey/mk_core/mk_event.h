@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include "mk_macros.h"
 #include "mk_list.h"
+#include "mk_bucket_queue.h"
 
 #ifndef MK_EVENT_H
 #define MK_EVENT_H
@@ -86,11 +87,13 @@ struct mk_event {
     int      type;     /* event type  */
     uint32_t mask;     /* events mask */
     uint8_t  status;   /* internal status */
+    char    priority;  /* optional priority */
     void    *data;     /* custom data reference */
 
     /* function handler for custom type */
     int     (*handler)(void *data);
     struct mk_list _head;
+    struct mk_list _priority_head;
 };
 
 struct mk_event_loop {
@@ -139,5 +142,59 @@ int mk_event_wait(struct mk_event_loop *loop);
 int mk_event_translate(struct mk_event_loop *loop);
 char *mk_event_backend();
 struct mk_event_fdt *mk_event_get_fdt();
+
+inline void mk_event_load_bucket_queue(struct mk_event *event,
+                                      struct mk_bucket_queue *bktq,
+                                      struct mk_event_loop *evl)
+{
+    mk_event_foreach(event, evl) {
+        mk_bucket_queue_add(bktq, &event->_priority_head, event->priority);
+    }
+}
+
+#define mk_event_priority_live_foreach(event, bktq, evl)                                \
+    for (                                                                               \
+        /* init */                                                                      \
+        mk_event_wait(evl),                                                             \
+        mk_event_load_bucket_queue(event, bktq, evl),                                   \
+        event = mk_list_entry(                                                          \
+                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head);   \
+                                                                                        \
+        /* condition */                                                                 \
+        !mk_bucket_queue_is_empty(bktq);                                                \
+                                                                                        \
+        /* update */                                                                    \
+        mk_bucket_queue_delete_min(bktq),                                               \
+        mk_event_wait(evl), /* change to non blocking */                                \
+        mk_event_load_bucket_queue(event, bktq, evl),                                   \
+        event = mk_list_entry(                                                          \
+                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head)    \                                                                     \
+    )
+
+
+
+void processQueue(struct mk_event *event, struct mk_bucket_queue *bktq, struct mk_event_loop *evl){
+    // consume event loop items
+    for (
+        /* init */
+        mk_event_wait(evl),
+        mk_event_load_bucket_queue(event, bktq, evl),
+        event = mk_list_entry(
+                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head);
+
+        /* condition */
+        !mk_bucket_queue_is_empty(bktq);
+
+        /* update */
+        mk_bucket_queue_delete_min(bktq),
+        mk_event_wait(evl), /* change to non blocking */
+        mk_event_load_bucket_queue(event, bktq, evl),
+        event = mk_list_entry(
+                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head)
+        )
+
+}
+
+
 
 #endif
