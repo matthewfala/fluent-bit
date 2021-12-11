@@ -53,6 +53,23 @@
 #define FLB_ENGINE_TASK         2
 #define FLB_ENGINE_IN_THREAD    3
 
+/* Engine priority queue configuration */
+#define FLB_ENGINE_LOOP_MAX_ITER        10 /* Max events processed per round */
+
+/* Engine event priorities: min value prioritized */
+#define FLB_ENGINE_PRIORITY_COUNT       8
+#define FLB_ENGINE_PRIORITY_TOP         0
+#define FLB_ENGINE_PRIORITY_BOTTOM      FLB_ENGINE_PRIORITY_COUNT - 1
+#define FLB_ENGINE_PRIORITY_NETWORK     1
+
+#define FLB_ENGINE_PRIORITY_CB_SCHED    FLB_ENGINE_PRIORITY_TOP
+#define FLB_ENGINE_PRIORITY_CB_TIMER    FLB_ENGINE_PRIORITY_TOP
+#define FLB_ENGINE_PRIORITY_SHUTDOWN    FLB_ENGINE_PRIORITY_TOP
+#define FLB_ENGINE_PRIORITY_DNS         FLB_ENGINE_PRIORITY_NETWORK
+#define FLB_ENGINE_PRIORITY_CONNECT     FLB_ENGINE_PRIORITY_NETWORK
+#define FLB_ENGINE_PRIORITY_SEND_RECV   FLB_ENGINE_PRIORITY_NETWORK
+#define FLB_ENGINE_PRIORITY_DEFAULT     MK_EVENT_PRIORITY_DEFAULT
+
 int flb_engine_start(struct flb_config *config);
 int flb_engine_failed(struct flb_config *config);
 int flb_engine_flush(struct flb_config *config,
