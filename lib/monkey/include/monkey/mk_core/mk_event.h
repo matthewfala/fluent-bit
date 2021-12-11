@@ -152,49 +152,27 @@ inline void mk_event_load_bucket_queue(struct mk_event *event,
     }
 }
 
-#define mk_event_priority_live_foreach(event, bktq, evl)                                \
+#define mk_event_priority_live_foreach(event, bktq, evl, max_iter)                      \
+    int __mk_event_priority_live_foreach_iter;                                          \
     for (                                                                               \
         /* init */                                                                      \
+        __mk_event_priority_live_foreach_iter = 0,                                      \
         mk_event_wait(evl),                                                             \
         mk_event_load_bucket_queue(event, bktq, evl),                                   \
         event = mk_list_entry(                                                          \
                     mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head);   \
                                                                                         \
         /* condition */                                                                 \
-        !mk_bucket_queue_is_empty(bktq);                                                \
+        !mk_bucket_queue_is_empty(bktq) &&                                              \
+        (__mk_event_priority_live_foreach_iter < max_iter || max_iter == -1)            \
                                                                                         \
         /* update */                                                                    \
+        ++__mk_event_priority_live_foreach_iter,                                        \
         mk_bucket_queue_delete_min(bktq),                                               \
         mk_event_wait(evl), /* change to non blocking */                                \
         mk_event_load_bucket_queue(event, bktq, evl),                                   \
         event = mk_list_entry(                                                          \
                     mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head)    \                                                                     \
     )
-
-
-
-void processQueue(struct mk_event *event, struct mk_bucket_queue *bktq, struct mk_event_loop *evl){
-    // consume event loop items
-    for (
-        /* init */
-        mk_event_wait(evl),
-        mk_event_load_bucket_queue(event, bktq, evl),
-        event = mk_list_entry(
-                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head);
-
-        /* condition */
-        !mk_bucket_queue_is_empty(bktq);
-
-        /* update */
-        mk_bucket_queue_delete_min(bktq),
-        mk_event_wait(evl), /* change to non blocking */
-        mk_event_load_bucket_queue(event, bktq, evl),
-        event = mk_list_entry(
-                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head)
-        )
-
-}
-
-
 
 #endif
