@@ -27,23 +27,18 @@
 
 struct mk_bucket_queue
 {
-    struct mk_list **buckets;
+    struct mk_list *buckets;
     size_t n_buckets;
     struct mk_list *top;
 };
 
 static inline struct mk_bucket_queue *mk_bucket_queue_create(size_t priorities)
 {
-    int i;
     struct mk_bucket_queue *bucket_queue = (struct mk_bucket_queue *)
                                  mk_mem_alloc(sizeof(struct mk_bucket_queue));
-    bucket_queue->buckets = (struct mk_list **) mk_mem_alloc(sizeof(mk_list *) * priorities);
-    for (i = 0; i < priorities; ++i) {
-        bucket_queue->buckets[i] = (struct mk_list *) mk_mem_alloc(sizeof(mk_list));
-        mk_list_init(bucket_queue->buckets[i]);
-    }
+    bucket_queue->buckets = (struct mk_list *) mk_mem_alloc(sizeof(struct mk_list) * priorities);
     bucket_queue->n_buckets = priorities;
-    bucket_queue->top = sizeof(mk_list *) * priorities; /* one past the last element */
+    bucket_queue->top = (bucket_queue->buckets + bucket_queue->n_buckets); /* one past the last element */
     return bucket_queue;
 }
 
@@ -61,7 +56,7 @@ static inline int mk_bucket_queue_add(struct mk_bucket_queue *bucket_queue,
         return -1;
     }
 
-    mk_list_add(item, bucket_queue->buckets[priority]);
+    mk_list_add(item, &bucket_queue->buckets[priority]);
     if (&bucket_queue->buckets[priority] < bucket_queue->top) {
         bucket_queue->top = &bucket_queue->buckets[priority];
     }
@@ -72,7 +67,7 @@ static inline int mk_bucket_queue_add(struct mk_bucket_queue *bucket_queue,
 static inline struct mk_list *mk_bucket_queue_find_min(struct mk_bucket_queue *bucket_queue)
 {
     if (mk_bucket_queue_is_empty(bucket_queue)) {
-        return nullptr;
+        return NULL;
     }
     return bucket_queue->top->next;
 }
@@ -101,16 +96,10 @@ static inline struct mk_list *mk_bucket_queue_pop_min(struct mk_bucket_queue *bu
 static inline int mk_bucket_queue_destroy(
                                      struct mk_bucket_queue *bucket_queue)
 {
-    
-    int i;
     if (!mk_bucket_queue_is_empty(bucket_queue)) {
         /* mk_err("Error: attempting to destroy non empty bucket_queue. Remove all items "
                   "first."); */
         return -1;
-    }
-    for (i = 0; i < bucket_queue->n_buckets; ++i) {
-        
-        mk_mem_free(bucket_queue->buckets[i]);
     }
     mk_mem_free(bucket_queue->buckets);
     mk_mem_free(bucket_queue);

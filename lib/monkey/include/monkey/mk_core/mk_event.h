@@ -143,7 +143,7 @@ int mk_event_translate(struct mk_event_loop *loop);
 char *mk_event_backend();
 struct mk_event_fdt *mk_event_get_fdt();
 
-inline void mk_event_load_bucket_queue(struct mk_event *event,
+static inline void mk_event_load_bucket_queue(struct mk_event *event,
                                       struct mk_bucket_queue *bktq,
                                       struct mk_event_loop *evl)
 {
