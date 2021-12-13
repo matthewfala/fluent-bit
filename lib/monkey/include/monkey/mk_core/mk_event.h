@@ -53,6 +53,9 @@
 #define MK_EVENT_NONE            1    /* nothing */
 #define MK_EVENT_REGISTERED      2    /* event is registered into the ev loop */
 
+/* Priority bucket queue */
+#define MK_EVENT_PRIORITY_DEFAULT 6   /* default priority */
+
 /* Legacy definitions: temporal
  *  ----------------------------
  *
@@ -87,13 +90,13 @@ struct mk_event {
     int      type;     /* event type  */
     uint32_t mask;     /* events mask */
     uint8_t  status;   /* internal status */
-    char    priority;  /* optional priority */
     void    *data;     /* custom data reference */
 
     /* function handler for custom type */
     int     (*handler)(void *data);
     struct mk_list _head;
     struct mk_list _priority_head;
+    char    priority;  /* optional priority */
 };
 
 struct mk_event_loop {
@@ -144,14 +147,10 @@ int mk_event_translate(struct mk_event_loop *loop);
 char *mk_event_backend();
 struct mk_event_fdt *mk_event_get_fdt();
 
-static inline void mk_event_load_bucket_queue(struct mk_event *event,
+/* Having trouble getting this function inlined */
+void mk_event_load_bucket_queue(struct mk_event *event,
                                       struct mk_bucket_queue *bktq,
-                                      struct mk_event_loop *evl)
-{
-    mk_event_foreach(event, evl) {
-        mk_bucket_queue_add(bktq, &event->_priority_head, event->priority);
-    }
-}
+                                      struct mk_event_loop *evl);
 
 #define mk_event_priority_live_foreach(event, bktq, evl, max_iter)                      \
     int __mk_event_priority_live_foreach_iter;                                          \
@@ -169,7 +168,7 @@ static inline void mk_event_load_bucket_queue(struct mk_event *event,
         /* update */                                                                    \
         ++__mk_event_priority_live_foreach_iter,                                        \
         mk_bucket_queue_delete_min(bktq),                                               \
-        mk_event_wait_2(evl, 0), /* change to non blocking */                              \
+        mk_event_wait_2(evl, 0),                                                        \
         mk_event_load_bucket_queue(event, bktq, evl),                                   \
         event = mk_list_entry(                                                          \
                     mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head)    \

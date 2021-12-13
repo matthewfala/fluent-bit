@@ -163,6 +163,16 @@ int mk_event_channel_create(struct mk_event_loop *loop,
     return _mk_event_channel_create(ctx, r_fd, w_fd, data);
 }
 
+/* priority queue utility */
+void mk_event_load_bucket_queue(struct mk_event *event,
+                                      struct mk_bucket_queue *bktq,
+                                      struct mk_event_loop *evl)
+{
+    mk_event_foreach(event, evl) {
+        mk_bucket_queue_add(bktq, &event->_priority_head, event->priority);
+    }
+}
+
 /* Poll events */
 int mk_event_wait(struct mk_event_loop *loop)
 {

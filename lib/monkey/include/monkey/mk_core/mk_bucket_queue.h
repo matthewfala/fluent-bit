@@ -34,9 +34,13 @@ struct mk_bucket_queue
 
 static inline struct mk_bucket_queue *mk_bucket_queue_create(size_t priorities)
 {
+    size_t i;
     struct mk_bucket_queue *bucket_queue = (struct mk_bucket_queue *)
                                  mk_mem_alloc(sizeof(struct mk_bucket_queue));
     bucket_queue->buckets = (struct mk_list *) mk_mem_alloc(sizeof(struct mk_list) * priorities);
+    for (i = 0; i < priorities; ++i) {
+        mk_list_init(&bucket_queue->buckets[i]);
+    }
     bucket_queue->n_buckets = priorities;
     bucket_queue->top = (bucket_queue->buckets + bucket_queue->n_buckets); /* one past the last element */
     return bucket_queue;
