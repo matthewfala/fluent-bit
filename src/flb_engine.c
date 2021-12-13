@@ -524,8 +524,8 @@ int flb_engine_start(struct flb_config *config)
     }
     config->evl = evl;
 
-    /* Create the bucket queue (8 priorities) */
-    evl_bktq = mk_bucket_queue_create(8);
+    /* Create the bucket queue (FLB_ENGINE_PRIORITY_COUNT priorities) */
+    evl_bktq = mk_bucket_queue_create(FLB_ENGINE_PRIORITY_COUNT);
 
     /* Register the event loop on this thread */
     flb_engine_evl_init();
@@ -726,6 +726,7 @@ int flb_engine_start(struct flb_config *config)
                                                                   1,
                                                                   0,
                                                                   event);
+                    event->priority = FLB_ENGINE_PRIORITY_SHUTDOWN;
                 }
                 else if (ret == FLB_ENGINE_SHUTDOWN) {
                     if (config->shutdown_fd > 0) {
