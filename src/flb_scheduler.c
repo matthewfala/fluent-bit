@@ -468,7 +468,7 @@ int flb_sched_timer_cb_create(struct flb_sched *sched, int type, int ms,
 
     /* Create the frame timer */
     fd = mk_event_timeout_create(sched->evl, sec, nsec, event);
-    event = FLB_ENGINE_PRIORITY_CB_TIMER;
+    event->priority = FLB_ENGINE_PRIORITY_CB_TIMER;
     if (fd == -1) {
         flb_error("[sched] cannot do timeout_create()");
         flb_sched_timer_destroy(timer);

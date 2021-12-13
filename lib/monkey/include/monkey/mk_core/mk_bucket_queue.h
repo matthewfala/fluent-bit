@@ -83,8 +83,8 @@ static inline void mk_bucket_queue_delete_min(struct mk_bucket_queue *bucket_que
     }
 
     mk_list_del(bucket_queue->top->next);
-    while (mk_list_is_empty(bucket_queue->top) &&
-          !mk_bucket_queue_is_empty(bucket_queue)) {
+    while (!mk_bucket_queue_is_empty(bucket_queue)
+          && (mk_list_is_empty(bucket_queue->top) == 0)) {
         ++bucket_queue->top;
     }
 }
