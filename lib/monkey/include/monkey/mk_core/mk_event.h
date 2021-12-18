@@ -158,20 +158,23 @@ void mk_event_load_bucket_queue(struct mk_event *event,
         /* init */                                                                      \
         __mk_event_priority_live_foreach_iter = 0,                                      \
         mk_event_load_bucket_queue(event, bktq, evl),                                   \
-        event = mk_list_entry(                                                          \
-                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head);   \
+        event = mk_bucket_queue_find_min(bktq) ?                                        \
+                mk_list_entry(                                                          \
+                    mk_bucket_queue_pop_min(bktq), struct mk_event, _priority_head) :   \
+                NULL;                                                                   \
                                                                                         \
         /* condition */                                                                 \
-        !mk_bucket_queue_is_empty(bktq) &&                                              \
+        event != NULL &&                                                                \
         (__mk_event_priority_live_foreach_iter < max_iter || max_iter == -1);           \
                                                                                         \
         /* update */                                                                    \
         ++__mk_event_priority_live_foreach_iter,                                        \
-        mk_bucket_queue_delete_min(bktq),                                               \
         mk_event_wait_2(evl, 0),                                                        \
         mk_event_load_bucket_queue(event, bktq, evl),                                   \
-        event = mk_list_entry(                                                          \
-                    mk_bucket_queue_find_min(bktq), struct mk_event, _priority_head)    \
+        event = mk_bucket_queue_find_min(bktq) ?                                        \
+                mk_list_entry(                                                          \
+                    mk_bucket_queue_pop_min(bktq), struct mk_event, _priority_head) :   \
+                NULL                                                                    \
     )
 
 #endif

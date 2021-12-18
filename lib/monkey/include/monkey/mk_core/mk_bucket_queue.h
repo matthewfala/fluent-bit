@@ -59,7 +59,6 @@ static inline int mk_bucket_queue_add(struct mk_bucket_queue *bucket_queue,
                "priority range", priority); */
         return -1;
     }
-
     mk_list_add(item, &bucket_queue->buckets[priority]);
     if (&bucket_queue->buckets[priority] < bucket_queue->top) {
         bucket_queue->top = &bucket_queue->buckets[priority];

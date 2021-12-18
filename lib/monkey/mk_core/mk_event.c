@@ -169,7 +169,9 @@ void mk_event_load_bucket_queue(struct mk_event *event,
                                       struct mk_event_loop *evl)
 {
     mk_event_foreach(event, evl) {
-        mk_bucket_queue_add(bktq, &event->_priority_head, event->priority);
+        if (event->_priority_head.prev == NULL) {
+            mk_bucket_queue_add(bktq, &event->_priority_head, event->priority);
+        }
     }
 }
 
