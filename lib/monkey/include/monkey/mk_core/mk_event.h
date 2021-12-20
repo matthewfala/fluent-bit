@@ -153,7 +153,7 @@ void mk_event_load_bucket_queue(struct mk_event *event,
                                       struct mk_event_loop *evl);
 
 #define mk_event_priority_live_foreach(event, bktq, evl, max_iter)                      \
-    int __mk_event_priority_live_foreach_iter;                                          \
+    int __mk_event_priority_live_foreach_iter;  /* should enclose? */                   \
     for (                                                                               \
         /* init */                                                                      \
         __mk_event_priority_live_foreach_iter = 0,                                      \
