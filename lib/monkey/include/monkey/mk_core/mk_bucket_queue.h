@@ -18,6 +18,12 @@
  *  limitations under the License.
  */
 
+/*
+ * Note: This implementation can handle priority item removal via
+ * mk_bucket_delete_min(bucket_queue) and direct item removal
+ * via mk_list_del(&item)
+ */
+
 #ifndef   	MK_BUCKET_QUEUE_H_
 #define   	MK_BUCKET_QUEUE_H_
 
@@ -53,6 +59,13 @@ static inline int mk_bucket_queue_is_empty(struct mk_bucket_queue *bucket_queue)
     return bucket_queue->top == (bucket_queue->buckets + bucket_queue->n_buckets);
 }
 
+static inline void mk_bucket_queue_seek(struct mk_bucket_queue *bucket_queue) {
+    while (!mk_bucket_queue_is_empty(bucket_queue)
+          && (mk_list_is_empty(bucket_queue->top) == 0)) {
+        ++bucket_queue->top;
+    }
+}
+
 static inline int mk_bucket_queue_add(struct mk_bucket_queue *bucket_queue,
                                       struct mk_list *item, size_t priority)
 {
@@ -61,6 +74,7 @@ static inline int mk_bucket_queue_add(struct mk_bucket_queue *bucket_queue,
                "priority range", priority); */
         return -1;
     }
+    mk_bucket_queue_seek(bucket_queue);
     mk_list_add(item, &bucket_queue->buckets[priority]);
     if (&bucket_queue->buckets[priority] < bucket_queue->top) {
         bucket_queue->top = &bucket_queue->buckets[priority];
@@ -75,6 +89,7 @@ static inline struct mk_list *mk_bucket_queue_find_min(struct mk_bucket_queue *b
     if (mk_bucket_queue_is_empty(bucket_queue)) {
         return NULL;
     }
+    mk_bucket_queue_seek(bucket_queue);
     return bucket_queue->top->next;
 }
 
@@ -83,12 +98,9 @@ static inline void mk_bucket_queue_delete_min(struct mk_bucket_queue *bucket_que
     if (mk_bucket_queue_is_empty(bucket_queue)) {
         return;
     }
-
+    mk_bucket_queue_seek(bucket_queue);
     mk_list_del(bucket_queue->top->next);
-    while (!mk_bucket_queue_is_empty(bucket_queue)
-          && (mk_list_is_empty(bucket_queue->top) == 0)) {
-        ++bucket_queue->top;
-    }
+    mk_bucket_queue_seek(bucket_queue); /* this line can be removed. Debugging is harder */
     --bucket_queue->n_items;
 }
 

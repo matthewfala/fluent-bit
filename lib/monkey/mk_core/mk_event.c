@@ -120,6 +120,12 @@ int mk_event_del(struct mk_event_loop *loop, struct mk_event *event)
         return -1;
     }
 
+    /* Remove from priority queue */
+    if (event->_priority_head.next != NULL &&
+        event->_priority_head.prev != NULL) {
+        mk_list_del(&event->_priority_head);
+    }
+
     /* Reset the status and mask */
     MK_EVENT_NEW(event);
 
