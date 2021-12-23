@@ -339,6 +339,10 @@ static int net_connect_sync(int fd, const struct sockaddr *addr, socklen_t addrl
                       fd, host, port);
             goto exit_error;
         }
+        flb_info("[net] connection #%i made to: "
+                      "%s:%i", fd, host, port);
+        flb_info("[net] connection #%i error flb_socket_error()=%i, errno=%i: ",
+                fd, flb_socket_error(fd), errno);
     }
 
     /*

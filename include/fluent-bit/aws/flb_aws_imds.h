@@ -21,7 +21,7 @@
 #ifndef FLB_AWS_IMDS
 #define FLB_AWS_IMDS
 
-#define FLB_AWS_IMDS_HOST "169.254.169.254"
+#define FLB_AWS_IMDS_HOST "169.254.169.253"
 #define FLB_AWS_IMDS_HOST_LEN 15
 #define FLB_AWS_IMDS_PORT 80
 #define FLB_AWS_IMDS_TIMEOUT 1  /* 1 second */
