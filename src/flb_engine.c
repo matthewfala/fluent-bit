@@ -696,7 +696,7 @@ int flb_engine_start(struct flb_config *config)
 
     while (1) {
         mk_event_wait(evl); /* potentially conditional mk_event_wait or mk_event_wait_2 based on bucket queue capacity for one shot events */
-        mk_event_priority_live_foreach(event, evl_bktq, evl, 10) { /* 100 max events */
+        mk_event_priority_live_foreach(event, evl_bktq, evl, FLB_ENGINE_LOOP_MAX_ITER) {
             if (event->type == FLB_ENGINE_EV_CORE) {
                 ret = flb_engine_handle_event(event->fd, event->mask, config);
                 if (ret == FLB_ENGINE_STOP) {

@@ -176,6 +176,7 @@ static void output_thread(void *data)
     struct mk_event *event;
     struct flb_sched *sched;
     struct flb_task *task;
+    struct mk_bucket_queue *evl_bktq;
     struct flb_upstream_conn *u_conn;
     struct flb_output_instance *ins;
     struct flb_output_coro *out_coro;
@@ -202,6 +203,9 @@ static void output_thread(void *data)
      * of the scope of this thread.
      */
     flb_engine_evl_set(th_ins->evl);
+
+    /* Create the bucket queue (FLB_ENGINE_PRIORITY_COUNT priorities) */
+    evl_bktq = mk_bucket_queue_create(FLB_ENGINE_PRIORITY_COUNT);
 
     /* Set the upstream queue */
     flb_upstream_list_set(&th_ins->upstreams);
@@ -246,7 +250,8 @@ static void output_thread(void *data)
     /* Thread event loop */
     while (running) {
         mk_event_wait(th_ins->evl);
-        mk_event_foreach(event, th_ins->evl) {
+        mk_event_priority_live_foreach(event, evl_bktq, th_ins->evl,
+                                      FLB_ENGINE_LOOP_MAX_ITER) {
             /*
              * FIXME
              * -----
