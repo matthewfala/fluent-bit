@@ -86,19 +86,19 @@ static inline int mk_bucket_queue_add(struct mk_bucket_queue *bucket_queue,
 /* fifo based on priority */
 static inline struct mk_list *mk_bucket_queue_find_min(struct mk_bucket_queue *bucket_queue)
 {
+    mk_bucket_queue_seek(bucket_queue);
     if (mk_bucket_queue_is_empty(bucket_queue)) {
         return NULL;
     }
-    mk_bucket_queue_seek(bucket_queue);
     return bucket_queue->top->next;
 }
 
 static inline void mk_bucket_queue_delete_min(struct mk_bucket_queue *bucket_queue)
 {
+    mk_bucket_queue_seek(bucket_queue);
     if (mk_bucket_queue_is_empty(bucket_queue)) {
         return;
     }
-    mk_bucket_queue_seek(bucket_queue);
     mk_list_del(bucket_queue->top->next);
     mk_bucket_queue_seek(bucket_queue); /* this line can be removed. Debugging is harder */
     --bucket_queue->n_items;
@@ -115,6 +115,7 @@ static inline struct mk_list *mk_bucket_queue_pop_min(struct mk_bucket_queue *bu
 static inline int mk_bucket_queue_destroy(
                                      struct mk_bucket_queue *bucket_queue)
 {
+    mk_bucket_queue_seek(bucket_queue);
     if (!mk_bucket_queue_is_empty(bucket_queue)) {
         /* mk_err("Error: attempting to destroy non empty bucket_queue. Remove all items "
                   "first."); */
