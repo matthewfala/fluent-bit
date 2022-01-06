@@ -114,6 +114,8 @@ struct flb_config {
 
     struct mk_event_loop *evl;          /* the event loop (mk_core) */
 
+    struct mk_bucket_queue *evl_bktq;   /* bucket queue for evl track event priority */
+
     /* Proxies */
     struct mk_list proxies;
 

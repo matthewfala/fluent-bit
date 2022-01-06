@@ -526,6 +526,10 @@ int flb_engine_start(struct flb_config *config)
 
     /* Create the bucket queue (FLB_ENGINE_PRIORITY_COUNT priorities) */
     evl_bktq = mk_bucket_queue_create(FLB_ENGINE_PRIORITY_COUNT);
+    if (!evl_bktq) {
+        return -1;
+    }
+    config->evl_bktq = evl_bktq;
 
     /* Register the event loop on this thread */
     flb_engine_evl_init();
