@@ -795,17 +795,17 @@ int flb_engine_start(struct flb_config *config)
                 flb_sched_event_handler(config, event);
             }
             else if (event->type == FLB_ENGINE_EV_THREAD_ENGINE) {
-                struct flb_coro *co;
+                struct flb_output_coro *output_coro;
 
                 /* Read the coroutine reference */
-                ret = flb_pipe_r(event->fd, &co, sizeof(struct flb_output_coro *));
-                if (ret <= 0 || co == 0) {
+                ret = flb_pipe_r(event->fd, &output_coro, sizeof(struct flb_output_coro *));
+                if (ret <= 0 || output_coro == 0) {
                     flb_errno();
                     continue;
                 }
 
                 /* Init coroutine */
-                flb_coro_resume(co);
+                flb_coro_resume(output_coro->coro);
             }
             else if (event->type == FLB_ENGINE_EV_CUSTOM) {
                 event->handler(event);
