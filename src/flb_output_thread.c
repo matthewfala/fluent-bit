@@ -481,6 +481,7 @@ int flb_output_thread_pool_create(struct flb_config *config,
         }
         /* Signal type to indicate a "flush" request */
         th_ins->event.type = FLB_ENGINE_EV_THREAD_OUTPUT;
+        th_ins->event.priority = FLB_ENGINE_PRIORITY_THREAD;
 
         /* Spawn the thread */
         th = flb_tp_thread_create(tp, output_thread, th_ins, config);
