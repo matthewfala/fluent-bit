@@ -427,6 +427,9 @@ void flb_config_exit(struct flb_config *config)
     if (config->evl) {
         mk_event_loop_destroy(config->evl);
     }
+    if (config->evl_bktq) {
+        mk_bucket_queue_destroy(config->evl_bktq);
+    }
 
     flb_plugins_unregister(config);
     flb_free(config);
