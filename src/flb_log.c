@@ -466,3 +466,99 @@ int flb_log_destroy(struct flb_log *log, struct flb_config *config)
 
     return 0;
 }
+
+/* Instrumentation start */
+static inline long flb_log_timestamp() {
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    return time.tv_sec * 1000 + time.tv_usec / 1000;
+}
+
+char* folder_path;
+char* single_event_file_name = "_metrics.txt";
+static char session[100] = {0};
+static char buffer[PATH_MAX];
+static char session_path[PATH_MAX];
+static char single_event_path[PATH_MAX] = {0};
+
+static void recover_session() {
+    long milliseconds;
+    int cursor = 0;
+
+    /* get session */
+    if (session[0] == 0) {
+        folder_path = getenv("FLB_INSTRUMENTATION_OUT_PATH");
+        if (!folder_path) {
+            strcpy(buffer, getenv("HOME"));
+            cursor+=strlen(getenv("HOME"));
+            strcpy(buffer+cursor, "/instrumentation");
+            mkdir(buffer, 0755);
+            folder_path = buffer;
+        }
+        cursor = 0;
+        milliseconds = flb_log_timestamp();
+        sprintf(session, "%ld", milliseconds);
+        strcpy(session_path, folder_path);
+        cursor+=strlen(folder_path);
+        session_path[cursor++] = (char)'/';
+        strcpy(session_path+cursor, session);
+        session_path[cursor++] = (char)'/';
+        mkdir(session_path, 0755);
+    }
+}
+
+void flb_log_single_event(const char* tag, const char* value) {
+    FILE *file;
+    int cursor = 0;
+
+    /* get session */
+    recover_session();
+
+    /* get _metrics.txt path */
+    if (single_event_path[0] == 0) {
+        strcpy(single_event_path, session_path);
+        cursor += strlen(session_path);
+        single_event_path[cursor++] = '/';
+        strcpy(single_event_path+cursor, single_event_file_name);
+    }
+
+    /* check file exists */
+    if ((file = fopen(single_event_path, "a"))) {
+        fprintf(file, "%s: %s\n", tag, value);
+        fclose(file);
+    }
+    else {
+        flb_error("[flb_log] could not open single event file");
+    }
+}
+
+void flb_log_recurring_event(const char* tag, const char* value) {
+    FILE *file;
+    char full_path[PATH_MAX];
+    long milliseconds;
+    int cursor = 0;
+
+    /* get session */
+    recover_session();
+
+    /* get full path */
+    cursor = 0;
+    strcpy(full_path, session_path);
+    cursor += strlen(session_path);
+    full_path[cursor++] = '/';
+    strcpy(full_path+cursor, tag);
+    cursor+=strlen(tag);
+    strcpy(full_path+cursor, ".csv");
+
+    /* check file exists */
+    if ((file = fopen(full_path, "a"))) {
+        milliseconds = flb_log_timestamp();
+        fprintf(file, "%ld, %s\n", milliseconds, value);
+        fclose(file);
+    }
+    else {
+        flb_error("[flb_log] could not open recurring event file");
+    }
+}
+
+/* Instrumentation end */
