@@ -246,6 +246,23 @@ static void output_thread(void *data)
     /* Thread event loop */
     while (running) {
         mk_event_wait(th_ins->evl);
+
+        // Instrumentation start
+        // static int workers_logged[1000] = {FLB_FALSE};
+        char tag[100];
+        char s_n_events[10];
+        char thread_id[50];
+        sprintf(tag, "flb_thread#%d_ready_coroutines", th_ins->th->id);
+        sprintf(s_n_events, "%d", th_ins->evl->n_events);
+        flb_log_recurring_event(tag, s_n_events);
+        /*if (!workers_logged[th_ins->th->id]) {
+            th_ins->th->id = FLB_TRUE;
+            sprintf(tag, "flb_worker_thread_#%d-id", th_ins->th->id);
+            sprintf(thread_id, "%p", coro);
+            flb_log_single_event(tag, thread_id);
+        }*/
+        // Instrumentation end
+        
         mk_event_priority_live_foreach(event, th_ins->evl_bktq, th_ins->evl,
                                       FLB_ENGINE_LOOP_MAX_ITER) {
             /*
