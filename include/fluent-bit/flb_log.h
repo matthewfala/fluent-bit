@@ -31,6 +31,10 @@
 #include <inttypes.h>
 #include <errno.h>
 
+// Instrumentation start
+#include <sys/time.h>
+// Instrumentation end
+
 /* FIXME: this extern should be auto-populated from flb_thread_storage.h */
 extern FLB_TLS_DEFINE(struct flb_log, flb_log_ctx)
 
@@ -106,6 +110,40 @@ int flb_log_set_file(struct flb_config *config, char *out);
 int flb_log_destroy(struct flb_log *log, struct flb_config *config);
 void flb_log_print(int type, const char *file, int line, const char *fmt, ...);
 
+/* Instrumentation patch */
+void flb_log_single_event(const char* tag, const char* value);
+void flb_log_recurring_event(const char* tag, const char* value);
+void flb_log_recurring_event_prefixed(const char* tag_suffix, const char* value);
+
+/* Instrumentation macros */
+#define flb_log_load_counter(dest, name)                            \
+    if (flb_output_thread_instance_get()) {                         \
+            dest = ++flb_output_thread_instance_get()->th->name; }  \
+    else { static int __FLB_LOG_LOAD_##name = 0;                    \
+            __FLB_LOG_LOAD_##name++;                                \
+            dest = __FLB_LOG_LOAD_##name; }
+
+#define flb_log_recurring_event_prefixed(tag_suffix, value)                 \
+    static char __FLB_LOG_tag[100];                                         \
+    struct flb_out_thread_instance *out = flb_output_thread_instance_get(); \
+    if (!out) {                                                             \
+        sprintf(__FLB_LOG_tag, "flb_engine_%s", tag_suffix);                \
+    }                                                                       \
+    else {                                                                  \
+        sprintf(__FLB_LOG_tag, "flb_thread#%d_%s", out->th->id, tag_suffix); \
+    }                                                                       \
+    flb_log_recurring_event(__FLB_LOG_tag, value);
+
+#define flb_log_time_code_prefixed(tag_suffix, code) \
+    struct timeval time;    \
+    gettimeofday(&time, NULL);  \
+    int start_time = time.tv_sec * 1000 + time.tv_usec / 1000;  \
+    code;    \
+    char timedelta[50]; \
+    gettimeofday(&time, NULL);  \
+    int end_time = time.tv_sec * 1000 + time.tv_usec / 1000;    \
+    sprintf(timedelta, "%d", end_time - start_time);    \
+    flb_log_recurring_event_prefixed(tag_suffix, timedelta);
 
 /* Logging macros */
 #define flb_helper(fmt, ...)                                    \
