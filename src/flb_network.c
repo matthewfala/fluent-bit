@@ -47,6 +47,11 @@
 #include <fluent-bit/flb_upstream.h>
 #include <fluent-bit/flb_scheduler.h>
 
+// Instrumentation start
+#include <fluent-bit/flb_output_thread.h>
+#include <fluent-bit/flb_thread_pool.h>
+// Instrumentation end
+
 #include <monkey/mk_core.h>
 #include <ares.h>
 
