@@ -56,6 +56,11 @@
 #include <fluent-bit/flb_socket.h>
 #include <fluent-bit/flb_upstream.h>
 
+// Instrumentation start
+#include <fluent-bit/flb_output_thread.h>
+#include <fluent-bit/flb_thread_pool.h>
+// Instrumentation end
+
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_macros.h>
 #include <fluent-bit/flb_network.h>

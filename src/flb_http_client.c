@@ -42,6 +42,10 @@
 #include <fluent-bit/flb_http_client_debug.h>
 #include <fluent-bit/flb_utils.h>
 
+// Instrumentation start
+#include <fluent-bit/flb_output_thread.h>
+#include <fluent-bit/flb_thread_pool.h>
+// Instrumentation end
 
 #include <mbedtls/base64.h>
 
@@ -1169,6 +1173,15 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
                                c->body_buf, c->body_len,
                                &bytes_body);
         if (ret == -1) {
+
+            // Instrumentation start
+            char occurances[10];
+            int counter;
+            flb_log_load_counter(counter, broken_pipe);
+            sprintf(occurances, "%d", counter);
+            flb_log_recurring_event_prefixed("broken_pipe", occurances);
+            // Instrumentation end
+
             flb_errno();
             return -1;
         }
@@ -1219,12 +1232,16 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
 
             ret = process_data(c);
             if (ret == FLB_HTTP_ERROR) {
+                flb_log_recurring_event("malformed-http-body", c->body_buf);
+                flb_log_recurring_event("malformed-http-data", c->resp.data);
                 flb_warn("[http_client] malformed HTTP response from %s:%i on "
                          "connection #%i", c->u_conn->u->tcp_host,
                          c->u_conn->u->tcp_port, c->u_conn->fd);
                 return -1;
             }
             else if (ret == FLB_HTTP_OK) {
+                /* flb_log_recurring_event("regular-http-data", c->resp.data); */
+
                 break;
             }
             else if (ret == FLB_HTTP_MORE) {

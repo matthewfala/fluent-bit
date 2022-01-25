@@ -70,7 +70,13 @@ struct flb_coro {
 
 #define FLB_CORO_DATA(coro)      (((char *) coro) + sizeof(struct flb_coro))
 
-static FLB_INLINE void flb_coro_yield(struct flb_coro *coro, int ended)
+// Instrumentation start
+#define flb_coro_yield(coro, ended) \
+    flb_log_time_code_prefixed("coro_yeild_time", \
+            flb_coro_yield_raw(coro, ended));
+// Instrumentation end
+
+static FLB_INLINE void flb_coro_yield_raw(struct flb_coro *coro, int ended)
 {
     co_switch(coro->caller);
 }

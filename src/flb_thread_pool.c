@@ -91,6 +91,12 @@ struct flb_tp_thread *flb_tp_thread_create(struct flb_tp *tp,
     /* Set the thread id */
     th->id = flb_tp_thread_get_id(tp);
 
+    // Instrumentation start
+    /* thread metrics */
+    th->broken_pipe = 0;
+    th->connect_timed_out_count = 0;
+    // Instrumentation end
+
     /* Link this thread context to the parent context list */
     mk_list_add(&th->_head, &tp->list_threads);
 
