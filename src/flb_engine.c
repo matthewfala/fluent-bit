@@ -691,6 +691,21 @@ int flb_engine_start(struct flb_config *config)
 
     while (1) {
         mk_event_wait(evl);
+
+        // Instrumentation start
+        // static int engine_instrumented = FLB_FALSE;
+        char s_n_events[10];
+        char buf[100];
+        sprintf(s_n_events, "%d", evl->n_events);
+        sprintf(buf, "flb_engine_ready_coroutines");
+        flb_log_recurring_event(buf, s_n_events);
+        /* if (!engine_instrumented) {
+            engine_instrumented = FLB_TRUE;
+            sprintf(buf, "%p", coro);
+            flb_log_single_event("flb_engine_thread-id", buf);
+        } */
+        // Instrumentation end
+        
         mk_event_foreach(event, evl) {
             if (event->type == FLB_ENGINE_EV_CORE) {
                 ret = flb_engine_handle_event(event->fd, event->mask, config);

@@ -30,6 +30,11 @@
 #include <fluent-bit/flb_utils.h>
 #include <fluent-bit/flb_thread_storage.h>
 
+// Instrumentation start
+#include <fluent-bit/flb_output_thread.h>
+#include <fluent-bit/flb_thread_pool.h>
+// Instrumentation end
+
 FLB_TLS_DEFINE(struct mk_list, flb_upstream_list_key);
 
 /* Config map for Upstream networking setup */
@@ -806,6 +811,14 @@ int flb_upstream_conn_timeouts(struct mk_list *list)
                 drop = FLB_TRUE;
 
                 if (!flb_upstream_is_shutting_down(u)) {
+                    // Instrumentation start
+                    char occurances[10];
+                    int counter;
+                    flb_log_load_counter(counter, connect_timed_out_count);
+                    sprintf(occurances, "%d", counter);
+                    flb_log_recurring_event_prefixed("connection_timed_out", occurances);
+                    // Instrumentation end
+
                     flb_error("[upstream] connection #%i to %s:%i timed out after "
                               "%i seconds",
                               u_conn->fd,

@@ -47,6 +47,10 @@ struct flb_tp_thread {
     struct flb_worker *worker;     /* worker context */
     struct mk_list _head;          /* link to flb_tp->list_threads */
     struct flb_config *config;
+
+    /* thread metrics */
+    int connect_timed_out_count;
+    int broken_pipe;
 };
 
 struct flb_tp {

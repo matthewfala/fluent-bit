@@ -48,6 +48,11 @@
 #include <fluent-bit/flb_upstream.h>
 #include <fluent-bit/flb_upstream_ha.h>
 
+// Instrumentation start
+#include <fluent-bit/flb_output_thread.h>
+#include <fluent-bit/flb_thread_pool.h>
+// Instrumentation end
+
 #include <cmetrics/cmetrics.h>
 #include <cmetrics/cmt_counter.h>
 
