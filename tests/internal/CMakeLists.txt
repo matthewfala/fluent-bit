@@ -22,6 +22,7 @@ set(UNIT_TESTS_FILES
   flb_time.c
   multiline.c
   timeout.c
+  mk_bucket_queue.c
   )
 
 if (NOT WIN32)
