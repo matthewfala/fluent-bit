@@ -260,11 +260,6 @@ static inline int _mk_event_channel_create(struct mk_event_ctx *ctx,
     return 0;
 }
 
-static inline int _mk_event_wait(struct mk_event_loop *loop)
-{
-    _mk_event_wait_2(loop, -1);
-}
-
 static inline int _mk_event_wait_2(struct mk_event_loop *loop, int timeout)
 {
     struct timespec timev = {timeout / 1000, (timeout % 1000) * 1000000};

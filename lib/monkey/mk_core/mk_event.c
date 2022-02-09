@@ -178,12 +178,13 @@ void mk_event_load_bucket_queue(struct mk_event *event,
 /* Poll events */
 int mk_event_wait(struct mk_event_loop *loop)
 {
-    return _mk_event_wait(loop);
+    return _mk_event_wait_2(loop, -1);
 }
 
 /*
  * Poll events with timeout in milliseconds
- * zero timeout is non blocking wait
+ * zero timeout for non blocking wait
+ * -1 timeout for infinite wait
  */
 int mk_event_wait_2(struct mk_event_loop *loop, int timeout)
 {

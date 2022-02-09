@@ -368,11 +368,6 @@ static void cb_wait_2_timeout(evutil_socket_t fd, short flags, void *data)
     *timedout_flag = 1;
 }
 
-static inline int _mk_event_wait(struct mk_event_loop *loop)
-{
-    return _mk_event_wait_2(loop, -1);
-}
-
 static inline int _mk_event_wait_2(struct mk_event_loop *loop, int timeout)
 {
     struct mk_event_ctx *ctx = loop->data;
