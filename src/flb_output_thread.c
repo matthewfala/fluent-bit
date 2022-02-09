@@ -359,7 +359,7 @@ static void output_thread(void *data)
     flb_upstream_conn_active_destroy_list(&th_ins->upstreams);
     flb_upstream_conn_pending_destroy_list(&th_ins->upstreams);
     mk_event_loop_destroy(th_ins->evl);
-    mk_bucket_queue_destroy(th_ins->evl_bktq);
+    flb_bucket_queue_destroy(th_ins->evl_bktq);
 
     flb_sched_destroy(sched);
     params = FLB_TLS_GET(out_coro_params);
@@ -407,7 +407,7 @@ int flb_output_thread_pool_create(struct flb_config *config,
     struct flb_tp *tp;
     struct flb_tp_thread *th;
     struct mk_event_loop *evl;
-    struct mk_bucket_queue *evl_bktq;
+    struct flb_bucket_queue *evl_bktq;
     struct flb_out_thread_instance *th_ins;
 
     /* Create the thread pool context */
@@ -450,7 +450,7 @@ int flb_output_thread_pool_create(struct flb_config *config,
             flb_free(th_ins);
             continue;
         }
-        evl_bktq = mk_bucket_queue_create(FLB_ENGINE_PRIORITY_COUNT);
+        evl_bktq = flb_bucket_queue_create(FLB_ENGINE_PRIORITY_COUNT);
         if (!evl_bktq) {
             flb_plg_error(ins, "could not create thread event loop bucket queue");
             flb_free(evl);
@@ -476,7 +476,7 @@ int flb_output_thread_pool_create(struct flb_config *config,
         if (ret == -1) {
             flb_plg_error(th_ins->ins, "could not create thread channel");
             mk_event_loop_destroy(th_ins->evl);
-            mk_bucket_queue_destroy(th_ins->evl_bktq);
+            flb_bucket_queue_destroy(th_ins->evl_bktq);
             flb_free(th_ins);
             continue;
         }

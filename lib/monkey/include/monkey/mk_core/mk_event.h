@@ -20,7 +20,6 @@
 #include <stdint.h>
 #include "mk_macros.h"
 #include "mk_list.h"
-#include "mk_bucket_queue.h"
 
 #ifndef MK_EVENT_H
 #define MK_EVENT_H

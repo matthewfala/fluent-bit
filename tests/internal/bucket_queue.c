@@ -12,7 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <monkey/mk_core/mk_bucket_queue.h>
+#include <fluent-bit/flb_bucket_queue.h>
 #include <monkey/mk_core/mk_list.h>
 
 #define TST_PRIORITY_OP_ADD    1
@@ -53,14 +53,14 @@ struct bucket_queue_op {
 
 void test_create_destroy()
 {
-    struct mk_bucket_queue *bucket_queue;
-    bucket_queue = mk_bucket_queue_create(100);
-    mk_bucket_queue_destroy(bucket_queue);
+    struct flb_bucket_queue *bucket_queue;
+    bucket_queue = flb_bucket_queue_create(100);
+    flb_bucket_queue_destroy(bucket_queue);
 }
 
 void test_add_priorities()
 {
-    struct mk_bucket_queue *bucket_queue;
+    struct flb_bucket_queue *bucket_queue;
 
     struct bucket_queue_op operations[] = {
         {
@@ -180,7 +180,7 @@ void test_add_priorities()
         { 0 }
     };
     
-    bucket_queue = mk_bucket_queue_create(4);
+    bucket_queue = flb_bucket_queue_create(4);
     struct bucket_queue_op *op;
     struct bucket_queue_op_add *op_desc_add;
     struct bucket_queue_op_pop *op_desc_pop;
@@ -196,7 +196,7 @@ void test_add_priorities()
             for (bucket_queue_entry = op_desc_add->entries; bucket_queue_entry->tag != 0;
                                                             ++bucket_queue_entry) {
                 bucket_queue_entry->add_idx = add_idx++;
-                ret = mk_bucket_queue_add(bucket_queue, &bucket_queue_entry->item,
+                ret = flb_bucket_queue_add(bucket_queue, &bucket_queue_entry->item,
                                    bucket_queue_entry->priority);
                 TEST_CHECK(ret == 0);
                 TEST_MSG("[op %zu][entry %zu] Add failed. Returned %d", op - operations,
@@ -206,7 +206,7 @@ void test_add_priorities()
 
         else if (op->op == TST_PRIORITY_OP_POP) {
             op_desc_pop = (struct bucket_queue_op_pop *) op->op_description;
-            list_entry = mk_bucket_queue_pop_min(bucket_queue);
+            list_entry = flb_bucket_queue_pop_min(bucket_queue);
             ret = strcmp("<EXPECT_NULL>", op_desc_pop->tag);
             
             if (ret == 0) {
@@ -238,7 +238,7 @@ void test_add_priorities()
         }
     }
 
-    mk_bucket_queue_destroy(bucket_queue);
+    flb_bucket_queue_destroy(bucket_queue);
 }
 
 TEST_LIST = {
