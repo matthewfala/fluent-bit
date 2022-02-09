@@ -20,6 +20,7 @@
 
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_log.h>
+#include <fluent-bit/flb_event_loop.h>
 #include <fluent-bit/flb_network.h>
 #include <fluent-bit/flb_scheduler.h>
 #include <fluent-bit/flb_output_plugin.h>
@@ -246,7 +247,7 @@ static void output_thread(void *data)
     /* Thread event loop */
     while (running) {
         mk_event_wait(th_ins->evl);
-        mk_event_priority_live_foreach(event, th_ins->evl_bktq, th_ins->evl,
+        flb_event_priority_live_foreach(event, th_ins->evl_bktq, th_ins->evl,
                                       FLB_ENGINE_LOOP_MAX_ITER) {
             /*
              * FIXME

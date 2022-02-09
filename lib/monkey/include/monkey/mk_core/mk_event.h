@@ -147,34 +147,4 @@ int mk_event_translate(struct mk_event_loop *loop);
 char *mk_event_backend();
 struct mk_event_fdt *mk_event_get_fdt();
 
-/* Having trouble getting this function inlined */
-void mk_event_load_bucket_queue(struct mk_event *event,
-                                      struct mk_bucket_queue *bktq,
-                                      struct mk_event_loop *evl);
-
-#define mk_event_priority_live_foreach(event, bktq, evl, max_iter)                      \
-    int __mk_event_priority_live_foreach_iter;  /* should enclose? */                   \
-    for (                                                                               \
-        /* init */                                                                      \
-        __mk_event_priority_live_foreach_iter = 0,                                      \
-        mk_event_load_bucket_queue(event, bktq, evl),                                   \
-        event = mk_bucket_queue_find_min(bktq) ?                                        \
-                mk_list_entry(                                                          \
-                    mk_bucket_queue_pop_min(bktq), struct mk_event, _priority_head) :   \
-                NULL;                                                                   \
-                                                                                        \
-        /* condition */                                                                 \
-        event != NULL &&                                                                \
-        (__mk_event_priority_live_foreach_iter < max_iter || max_iter == -1);           \
-                                                                                        \
-        /* update */                                                                    \
-        ++__mk_event_priority_live_foreach_iter,                                        \
-        mk_event_wait_2(evl, 0),                                                        \
-        mk_event_load_bucket_queue(event, bktq, evl),                                   \
-        event = mk_bucket_queue_find_min(bktq) ?                                        \
-                mk_list_entry(                                                          \
-                    mk_bucket_queue_pop_min(bktq), struct mk_event, _priority_head) :   \
-                NULL                                                                    \
-    )
-
 #endif
