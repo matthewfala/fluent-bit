@@ -262,10 +262,14 @@ static inline int _mk_event_channel_create(struct mk_event_ctx *ctx,
 
 static inline int _mk_event_wait(struct mk_event_loop *loop)
 {
-    struct mk_event_ctx *ctx = loop->data;
+    _mk_event_wait_2(loop, -1);
+}
 
-    loop->n_events = kevent(ctx->kfd, NULL, 0, ctx->events, ctx->queue_size, NULL);
-    return loop->n_events;
+static inline int _mk_event_wait_2(struct mk_event_loop *loop, int timeout)
+{
+    struct timespec timev = {timeout / 1000, (timeout % 1000) * 1000000};
+    loop->n_events = kevent(ctx->kfd, NULL, 0, ctx->events, ctx->queue_size,
+                            (timeout != -1) ? &timev : NULL);
 }
 
 static inline char *_mk_event_backend()

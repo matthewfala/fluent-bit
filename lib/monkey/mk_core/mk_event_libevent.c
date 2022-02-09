@@ -345,7 +345,8 @@ static inline int _mk_event_channel_create(struct mk_event_ctx *ctx,
     return 0;
 }
 
-static inline int _mk_event_wait(struct mk_event_loop *loop)
+
+static inline int _mk_event_wait_with_flags(struct mk_event_loop *loop, int flags)
 {
     struct mk_event_ctx *ctx = loop->data;
 
@@ -355,10 +356,58 @@ static inline int _mk_event_wait(struct mk_event_loop *loop)
      * is called.
      */
     ctx->fired_count = 0;
-    event_base_loop(ctx->base, EVLOOP_ONCE);
+    event_base_loop(ctx->base, flags);
     loop->n_events = ctx->fired_count;
 
     return loop->n_events;
+}
+
+static void cb_wait_2_timeout(evutil_socket_t fd, short flags, void *data)
+{
+    int *timedout_flag = (int *) data;
+    *timedout_flag = 1;
+}
+
+static inline int _mk_event_wait(struct mk_event_loop *loop)
+{
+    return _mk_event_wait_2(loop, -1);
+}
+
+static inline int _mk_event_wait_2(struct mk_event_loop *loop, int timeout)
+{
+    struct mk_event_ctx *ctx = loop->data;
+    struct timeval timev = {timeout / 1000, (timeout % 1000) * 1000}; /* (tv_sec, tv_usec} */
+    int timedout_flag = 0;
+    struct event *timeout_event;
+    int ret;
+
+    /* Infinite wait */
+    if (timeout == -1) {
+        return _mk_event_wait_with_flags(loop, EVLOOP_ONCE);
+    }
+
+    /* No wait: fast path, zero second timeout is nonblocking wait */
+    if (timeout == 0) {
+        return _mk_event_wait_with_flags(loop, EVLOOP_ONCE | EVLOOP_NONBLOCK);
+    }
+
+    /* Timed wait: slow path, blocking wait with timeout via timeout event */
+    /* Add timeout */
+    timeout_event = event_new(ctx->base, -1,
+                      EV_TIMEOUT,
+                      cb_timeout, &timedout_flag);
+    event_add(timeout_event, &timev);
+
+    /* Blocking wait */
+    ret = _mk_event_wait_with_flags(loop, EVLOOP_ONCE);
+
+    /* Remove timeout */
+    if (!timedout_flag) {
+        ret = event_del(timeout_event);
+    }
+    event_free(timeout_event);
+
+    return ret;
 }
 
 static inline char *_mk_event_backend()

@@ -301,16 +301,23 @@ static inline int _mk_event_channel_create(struct mk_event_ctx *ctx,
 
 static inline int _mk_event_wait(struct mk_event_loop *loop)
 {
+    _mk_event_wait_2(loop, -1);
+}
+
+static inline int _mk_event_wait_2(struct mk_event_loop *loop, int timeout)
+{
     int i;
     int f = 0;
     uint32_t mask;
     struct mk_event *fired;
     struct mk_event_ctx *ctx = loop->data;
+    struct timeval timev = {timeout / 1000, (timeout % 1000) * 1000};
 
     memcpy(&ctx->_rfds, &ctx->rfds, sizeof(fd_set));
     memcpy(&ctx->_wfds, &ctx->wfds, sizeof(fd_set));
 
-    loop->n_events = select(ctx->max_fd + 1, &ctx->_rfds, &ctx->_wfds, NULL, NULL);
+    loop->n_events = select(ctx->max_fd + 1, &ctx->_rfds, &ctx->_wfds, NULL,
+                            (timeout != -1) ? &timev : NULL);
     if (loop->n_events <= 0) {
         return loop->n_events;
     }
