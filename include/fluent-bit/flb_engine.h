@@ -73,7 +73,7 @@
 #define FLB_ENGINE_PRIORITY_CONNECT     FLB_ENGINE_PRIORITY_NETWORK
 #define FLB_ENGINE_PRIORITY_SEND_RECV   FLB_ENGINE_PRIORITY_NETWORK
 
-#define FLB_ENGINE_PRIORITY_THREAD      FLB_ENGINE_PRIORITY_BOTTOM /* below input (should actually be same as input so FLB_ENGINE_PRIORITY_DEFAULT...) */
+#define FLB_ENGINE_PRIORITY_THREAD      FLB_ENGINE_PRIORITY_DEFAULT
 
 int flb_engine_start(struct flb_config *config);
 int flb_engine_failed(struct flb_config *config);
