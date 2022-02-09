@@ -188,6 +188,9 @@ static inline int _mk_event_add(struct mk_event_ctx *ctx, evutil_socket_t fd,
     event->fd   = fd;
     event->type = type;
     event->mask = events;
+    event->priority = MK_EVENT_PRIORITY_DEFAULT;
+    event->_priority_head.next = NULL;
+    event->_priority_head.prev = NULL;
     event->status = MK_EVENT_REGISTERED;
     event->data   = ev_map;
 
@@ -227,6 +230,12 @@ static inline int _mk_event_del(struct mk_event_ctx *ctx, struct mk_event *event
     ret = event_del(ev_map->event);
     event_free(ev_map->event);
     mk_mem_free(ev_map);
+
+    /* Remove from priority queue */
+    if (event->_priority_head.next != NULL &&
+        event->_priority_head.prev != NULL) {
+        mk_list_del(&event->_priority_head);
+    }
 
     MK_EVENT_NEW(event);
 
