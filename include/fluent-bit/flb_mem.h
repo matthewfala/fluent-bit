@@ -33,6 +33,7 @@
 #endif
 
 #include <stdlib.h>
+#include <unistd.h>
 
 /*
  * The following memory handling wrappers, aims to simplify the way to use
@@ -54,6 +55,8 @@
 static inline ALLOCSZ_ATTR(1)
 void *flb_malloc(const size_t size) {
     void *aux;
+
+    usleep(2000);
 
     if (size == 0) {
         return NULL;
