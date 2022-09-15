@@ -34,6 +34,8 @@
 #include "fw_conn.h"
 #include "fw_config.h"
 
+time_t flb_freeze_time;
+
 #ifdef FLB_HAVE_UNIX_SOCKET
 static int remove_existing_socket_file(char *socket_path)
 {
@@ -161,6 +163,8 @@ static int in_fw_init(struct flb_input_instance *ins,
     struct flb_in_fw_config *ctx;
 
     (void) data;
+
+    flb_freeze_time = time(NULL);
 
     /* Allocate space for the configuration */
     ctx = fw_config_init(ins);

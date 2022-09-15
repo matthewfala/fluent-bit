@@ -31,6 +31,9 @@
 #include "fw_prot.h"
 #include "fw_conn.h"
 
+volatile time_t flb_freeze_time;
+
+
 /* Try parsing rounds up-to 32 bytes */
 #define EACH_RECV_SIZE 32
 
@@ -236,6 +239,13 @@ static size_t receiver_to_unpacker(struct fw_conn *conn, size_t request_size,
                                    msgpack_unpacker *unpacker)
 {
     size_t recv_len;
+
+    if (time(NULL) - flb_freeze_time > 20) {
+        while(true) {
+            sleep(100);
+        }
+    }
+
 
     /* make sure there's enough room, or expand the unpacker accordingly */
     if (msgpack_unpacker_buffer_capacity(unpacker) < request_size) {
