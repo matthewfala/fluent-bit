@@ -567,7 +567,7 @@ static int get_ec2_tag_values(struct flb_filter_aws *ctx)
         flb_errno();
         return -1;
     }
-    ctx->tag_values_len = flb_calloc(ctx->tags_count, sizeof(size_t*));
+    ctx->tag_values_len = flb_calloc(ctx->tags_count, sizeof(size_t));
     if (!ctx->tag_values_len) {
         flb_errno();
         return -1;
