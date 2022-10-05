@@ -511,7 +511,7 @@ static int get_ec2_tag_keys(struct flb_filter_aws *ctx)
 
             /* tag_key points to the first character of tag key as char* */
             tag_key = tags_list + tag_start;
-            strcpy(ctx->tag_keys[tag_index], tag_key);
+            memcpy(ctx->tag_keys[tag_index], tag_key, tag_key_len);
 
             flb_plg_debug(ctx->ins, "tag found: %s (len=%d)", ctx->tag_keys[tag_index],
                           tag_key_len);
