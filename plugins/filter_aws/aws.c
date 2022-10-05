@@ -464,7 +464,9 @@ static int get_ec2_tag_keys(struct flb_filter_aws *ctx)
     ret = get_metadata(ctx, FLB_FILTER_AWS_IMDS_INSTANCE_TAG, &tags_list, &len);
     if (ret < 0) {
         if (ret == -2) { /* if there are no tags, response status code is 404 */
-            flb_plg_warn(ctx->ins, "tags not available in the EC2 instance metadata");
+            flb_plg_warn(ctx->ins, "EC2 instance metadata tag request returned 404. "
+                                   "This likely indicates your instance has no tags "
+                                   "or the EC2 tagging metadata API is not enabled");
             ctx->tags_count = 0;
             return 0;
         }
