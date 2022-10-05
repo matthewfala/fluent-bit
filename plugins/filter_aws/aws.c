@@ -396,6 +396,12 @@ static int get_vpc_metadata(struct flb_filter_aws *ctx)
     vpc_path = flb_sds_printf(&vpc_path, "%s/%s/%s/",
                               "/latest/meta-data/network/interfaces/macs",
                               mac_id, "vpc-id");
+    if (!vpc_path) {
+        flb_errno();
+        flb_sds_destroy(mac_id);
+        flb_sds_destroy(vpc_path);
+        return -1;
+    }
     ret = get_metadata(ctx, vpc_path, &ctx->vpc_id, &ctx->vpc_id_len);
 
     flb_sds_destroy(mac_id);
