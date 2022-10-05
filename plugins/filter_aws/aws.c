@@ -491,7 +491,7 @@ static int get_ec2_tag_keys(struct flb_filter_aws *ctx)
             ctx->tags_count++;
         }
     }
-    ctx->tag_keys = flb_calloc(ctx->tags_count, sizeof(flb_sds_t*));
+    ctx->tag_keys = flb_calloc(ctx->tags_count, sizeof(flb_sds_t));
     if (!ctx->tag_keys) {
         flb_errno();
         flb_sds_destroy(tags_list);
@@ -560,7 +560,7 @@ static int get_ec2_tag_values(struct flb_filter_aws *ctx)
     flb_sds_t tag_value_path;
 
     /* initialize array for the tag values */
-    ctx->tag_values = flb_calloc(ctx->tags_count, sizeof(flb_sds_t*));
+    ctx->tag_values = flb_calloc(ctx->tags_count, sizeof(flb_sds_t));
     if (!ctx->tag_values) {
         flb_errno();
         return -1;
