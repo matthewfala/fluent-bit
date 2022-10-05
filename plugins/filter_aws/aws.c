@@ -559,6 +559,7 @@ static int get_ec2_tag_values(struct flb_filter_aws *ctx)
     flb_sds_t tag_value = NULL;
     size_t tag_value_len = 0;
     size_t tag_value_path_len;
+    flb_sds_t tag_value_path_mem;
     flb_sds_t tag_value_path;
 
     /* initialize array for the tag values */
@@ -577,18 +578,23 @@ static int get_ec2_tag_values(struct flb_filter_aws *ctx)
         /* fetch tag value using path: /latest/meta-data/tags/instance/{tag_name} */
         tag_value_path_len = ctx->tag_keys_len[i] + 1 +
                              strlen(FLB_FILTER_AWS_IMDS_INSTANCE_TAG);
-        tag_value_path = flb_sds_create_size(tag_value_path_len);
-        if (!tag_value_path) {
+        tag_value_path_mem = flb_sds_create_size(tag_value_path_len);
+        if (!tag_value_path_mem) {
             flb_errno();
             return -1;
         }
-        tag_value_path = flb_sds_printf(&tag_value_path, "%s/%s",
+        tag_value_path = flb_sds_printf(&tag_value_path_mem, "%s/%s",
                                         FLB_FILTER_AWS_IMDS_INSTANCE_TAG,
                                         ctx->tag_keys[i]);
+        if (!tag_value_path) {
+            flb_errno();
+            flb_sds_destroy(tag_value_path_mem);
+            return -1;
+        }
 
         ret = get_metadata(ctx, tag_value_path, &tag_value, &tag_value_len);
         if (ret < 0) {
-            flb_sds_destroy(tag_value_path);
+            flb_sds_destroy(tag_value_path_mem);
             if (ret == -2) {
                 flb_plg_error(ctx->ins, "no value for tag %s", ctx->tag_keys[i]);
                 continue;
