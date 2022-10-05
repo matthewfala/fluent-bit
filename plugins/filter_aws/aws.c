@@ -109,10 +109,14 @@ static void expose_aws_meta(struct flb_filter_aws *ctx)
         /* len("aws.ec2.tags.") = 13 */
         env_tag_name = flb_sds_create_size(13 + ctx->tag_keys_len[i]);
         if (!env_tag_name) {
-            flb_plg_error(ctx->ins, "failed to allocate memory for env tag name");
+            flb_errno();
             continue;
         }
         env_tag_name = flb_sds_printf(&env_tag_name, "aws.ec2.tags.%s", ctx->tag_keys[i]);
+        if (!env_tag_name) {
+            flb_errno();
+            continue;
+        }
         flb_env_set(env, env_tag_name, ctx->tag_values[i]);
         flb_sds_destroy(env_tag_name);
     }
