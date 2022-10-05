@@ -474,6 +474,14 @@ static int get_ec2_tag_keys(struct flb_filter_aws *ctx)
         return -1;
     }
 
+    /* if endpoint returned 200, normally at least 1 tag should be present */
+    /* for the sake of correctness, let's check the edge case when response is empty */
+    if (len == 0) {
+        ctx->tags_count = 0;
+        flb_sds_destroy(tags_list);
+        return -1;
+    }
+
     /* count number of tag keys and allocate memory for pointers and lengths */
     /* since get_metadata returned 0, we assume there is at least 1 tag */
     /* \n is separator, therefore number of items = number of \n + 1 */
