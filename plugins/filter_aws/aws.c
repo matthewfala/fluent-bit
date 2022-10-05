@@ -457,6 +457,7 @@ static int get_ec2_tag_keys(struct flb_filter_aws *ctx)
     size_t tag_start = 0;
     size_t tag_end = 0;
     flb_sds_t tag_key;
+    flb_sds_t tmp;
     size_t tag_key_len;
     size_t i;
 
@@ -522,12 +523,13 @@ static int get_ec2_tag_keys(struct flb_filter_aws *ctx)
 
             /* allocate new memory for the tag key value */
             /* + 1, because we need one more character for \0 */
-            ctx->tag_keys[tag_index] = flb_sds_create_size(tag_key_len + 1);
-            if (!ctx->tag_keys[tag_index]) {
+            tmp = flb_sds_create_size(tag_key_len + 1);
+            if (!tmp) {
                 flb_errno();
                 flb_sds_destroy(tags_list);
                 return -2;
             }
+            ctx->tag_keys[tag_index] = tmp;
 
             /* tag_key points to the first character of tag key as char* */
             tag_key = tags_list + tag_start;
