@@ -111,12 +111,21 @@ struct flb_filter_aws {
     size_t hostname_len;
     int hostname_include;
 
-    flb_sds_t *tag_keys;
-    size_t *tag_keys_len;
-    flb_sds_t *tag_values;
-    size_t *tag_values_len;
-    size_t tags_count;
+    /* tags_* fields are related to exposing EC2 tags in log labels */
+    /* tags_include defines if EC2 tags functionality is enabled */
     int tags_include;
+    /* tags_count defines how many tags are available to use */
+    /* it could be 0 if there are no tags defined or if metadata server has disabled */
+    /*   exposing tags functionality */
+    size_t tags_count;
+    /* tag_keys is an array of tag key strings */
+    flb_sds_t *tag_keys;
+    /* tag_keys_len is an array of lengths corresponding to tag_keys items */
+    size_t *tag_keys_len;
+    /* tag_values is an array of tag values strings */
+    flb_sds_t *tag_values;
+    /* tag_values_len is an array of lengths corresponding to tag_values items */
+    size_t *tag_values_len;
 
     /* number of new keys added by this plugin */
     int new_keys;
