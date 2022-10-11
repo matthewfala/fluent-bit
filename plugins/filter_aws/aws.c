@@ -48,6 +48,7 @@ static void expose_aws_meta(struct flb_filter_aws *ctx)
     struct flb_config *config = ctx->ins->config;
     size_t i;
     flb_sds_t env_tag_name;
+    flb_sds_t env_tag_name_mem;
 
     env = config->env;
 
@@ -103,18 +104,19 @@ static void expose_aws_meta(struct flb_filter_aws *ctx)
 
     for (i = 0; i < ctx->tags_count; i++) {
         /* len("aws.ec2.tags.") = 13 */
-        env_tag_name = flb_sds_create_size(13 + ctx->tag_keys_len[i]);
-        if (!env_tag_name) {
+        env_tag_name_mem = flb_sds_create_size(13 + ctx->tag_keys_len[i]);
+        if (!env_tag_name_mem) {
             flb_errno();
             continue;
         }
-        env_tag_name = flb_sds_printf(&env_tag_name, "aws.ec2.tags.%s", ctx->tag_keys[i]);
+        env_tag_name = flb_sds_printf(&env_tag_name_mem, "aws.ec2.tags.%s", ctx->tag_keys[i]);
         if (!env_tag_name) {
             flb_errno();
+            flb_sds_destroy(env_tag_name_mem);
             continue;
         }
         flb_env_set(env, env_tag_name, ctx->tag_values[i]);
-        flb_sds_destroy(env_tag_name);
+        flb_sds_destroy(env_tag_name_mem);
     }
 }
 
@@ -226,6 +228,8 @@ static int get_vpc_metadata(struct flb_filter_aws *ctx)
 {
     int ret;
     flb_sds_t mac_id = NULL;
+    flb_sds_t vpc_path;
+    flb_sds_t vpc_path_mem;
 
     mac_id = flb_aws_imds_get_vpc_id(ctx->client_imds);
     if (!mac_id) {
@@ -236,25 +240,25 @@ static int get_vpc_metadata(struct flb_filter_aws *ctx)
     /* the VPC full path should be like:
      *latest/meta-data/network/interfaces/macs/{mac_id}/vpc-id/"
      */
-    flb_sds_t vpc_path = flb_sds_create_size(70);
-    if (!vpc_path) {
+    vpc_path_mem = flb_sds_create_size(70);
+    if (!vpc_path_mem) {
         flb_errno();
         flb_sds_destroy(mac_id);
         return -1;
     }
-    vpc_path = flb_sds_printf(&vpc_path, "%s/%s/%s/",
+    vpc_path = flb_sds_printf(&vpc_path_mem, "%s/%s/%s/",
                               "/latest/meta-data/network/interfaces/macs",
                               mac_id, "vpc-id");
     if (!vpc_path) {
         flb_errno();
         flb_sds_destroy(mac_id);
-        flb_sds_destroy(vpc_path);
+        flb_sds_destroy(vpc_path_mem);
         return -1;
     }
     ret = flb_aws_imds_request(ctx->client_imds, vpc_path, &ctx->vpc_id, &ctx->vpc_id_len);
 
     flb_sds_destroy(mac_id);
-    flb_sds_destroy(vpc_path);
+    flb_sds_destroy(vpc_path_mem);
 
     return ret;
 }
