@@ -58,7 +58,6 @@ void flb_test_aws_ec2_tags_present() {
         response(
             expect(URI, "/latest/meta-data/tags/instance"),
             expect(METHOD, FLB_HTTP_GET),
-            expect(HEADER_COUNT, 1),
             set(STATUS, 200),
             set(PAYLOAD, "Name\nCUSTOMER_ID"),
             set(PAYLOAD_SIZE, 16)
@@ -66,7 +65,6 @@ void flb_test_aws_ec2_tags_present() {
         response(
             expect(URI, "/latest/meta-data/tags/instance/Name"),
             expect(METHOD, FLB_HTTP_GET),
-            expect(HEADER_COUNT, 1),
             set(STATUS, 200),
             set(PAYLOAD, "my_ec2_instance"),
             set(PAYLOAD_SIZE, 15)
@@ -74,7 +72,6 @@ void flb_test_aws_ec2_tags_present() {
         response(
             expect(URI, "/latest/meta-data/tags/instance/CUSTOMER_ID"),
             expect(METHOD, FLB_HTTP_GET),
-            expect(HEADER_COUNT, 1),
             set(STATUS, 200),
             set(PAYLOAD, "70ec5c04-3a6e-11ed-a261-0242ac120002"),
             set(PAYLOAD_SIZE, 36)
@@ -179,7 +176,6 @@ void flb_test_aws_ec2_tags_404() {
         response(
             expect(URI, "/latest/meta-data/tags/instance"),
             expect(METHOD, FLB_HTTP_GET),
-            expect(HEADER_COUNT, 1),
             set(STATUS, 404),
         ),
     );
