@@ -131,6 +131,7 @@ static void tls_context_destroy(void *ctx_backend)
     pthread_mutex_lock(&ctx->mutex);
     SSL_CTX_free(ctx->ctx);
     pthread_mutex_unlock(&ctx->mutex);
+    pthread_mutex_destroy(&ctx->mutex);
 
     flb_free(ctx);
 }
