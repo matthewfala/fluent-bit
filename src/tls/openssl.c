@@ -25,6 +25,11 @@
 #include <openssl/err.h>
 #include <openssl/opensslv.h>
 
+// Instrumentation start
+#include <fluent-bit/flb_output_thread.h>
+#include <fluent-bit/flb_thread_pool.h>
+// Instrumentation end
+
 /*
  * OPENSSL_VERSION_NUMBER has the following semantics
  *
@@ -329,6 +334,7 @@ static void *tls_session_create(struct flb_tls *tls,
     struct tls_session *session;
     struct tls_context *ctx = tls->ctx;
     SSL *ssl;
+    flb_log_recurring_event_prefixed("tls_session_create", "start, ");
 
     session = flb_calloc(1, sizeof(struct tls_session));
     if (!session) {
@@ -344,6 +350,7 @@ static void *tls_session_create(struct flb_tls *tls,
         flb_error("[openssl] could create new SSL context");
         flb_free(session);
         pthread_mutex_unlock(&ctx->mutex);
+        flb_log_recurring_event_prefixed("tls_session_create", "stop, fail");
         return NULL;
     }
     session->ssl = ssl;
@@ -364,6 +371,8 @@ static void *tls_session_create(struct flb_tls *tls,
     }
     SSL_set_connect_state(ssl);
     pthread_mutex_unlock(&ctx->mutex);
+    flb_log_recurring_event_prefixed("tls_session_create", "stop, success");
+
     return session;
 }
 
@@ -371,6 +380,12 @@ static int tls_session_destroy(void *session)
 {
     struct tls_session *ptr = session;
     struct tls_context *ctx;
+    int ret = 1000;
+    char ret_str[10];
+    char stop_buf[300];
+
+    flb_log_recurring_event_prefixed("tls_session_destroy_shutdown", "start, ");
+    flb_log_time_tick();
 
     if (!ptr) {
         return 0;
@@ -380,13 +395,26 @@ static int tls_session_destroy(void *session)
     pthread_mutex_lock(&ctx->mutex);
 
     if (flb_socket_error(ptr->fd) == 0) {
-        SSL_shutdown(ptr->ssl);
-        SSL_shutdown(ptr->ssl);
+        ret = SSL_shutdown(ptr->ssl);
+        sprintf(ret_str, "%i", ret);
+        flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_1_ret", ret_str);
+        sprintf(stop_buf, "openssl_err=%s, ret=%i, fd=%i", ERR_reason_error_string(ERR_get_error()), ret, ptr->fd);
+        flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_1_msg", stop_buf);
+
+        ret = SSL_shutdown(ptr->ssl);
+        sprintf(ret_str, "%i", ret);
+        flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_2_ret", ret_str);
+        sprintf(stop_buf, "openssl_err=%s, ret=%i, fd=%i", ERR_reason_error_string(ERR_get_error()), ret, ptr->fd);
+        flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_2_msg", stop_buf);
     }
     SSL_free(ptr->ssl);
     flb_free(ptr);
 
     pthread_mutex_unlock(&ctx->mutex);
+
+    sprintf(stop_buf, "stop, %i", ret);
+    flb_log_recurring_event_prefixed("tls_session_destroy_shutdown", (ret == 1000) ? "stop, success" : stop_buf);
+    flb_log_time_tock("tls_session_destroy_delta");
 
     return 0;
 }
@@ -396,8 +424,11 @@ static int tls_net_read(struct flb_upstream_conn *u_conn,
 {
     int ret;
     char err_buf[256];
+    char stop_buf[300];
     struct tls_session *session = (struct tls_session *) u_conn->tls_session;
     struct tls_context *ctx;
+
+    flb_log_recurring_event_prefixed("tls_net_read", "start,");
 
     ctx = session->parent;
     pthread_mutex_lock(&ctx->mutex);
@@ -417,11 +448,15 @@ static int tls_net_read(struct flb_upstream_conn *u_conn,
             flb_error("[tls] error: %s", err_buf);
         }
         else {
+            sprintf(err_buf, "undefined error: code %i", ret);
             ret = -1;
         }
     }
 
     pthread_mutex_unlock(&ctx->mutex);
+    sprintf(stop_buf, "stop, %s", (ret < 0) ? err_buf : "success");
+    flb_log_recurring_event_prefixed("tls_net_read", stop_buf);
+
     return ret;
 }
 
@@ -430,9 +465,13 @@ static int tls_net_write(struct flb_upstream_conn *u_conn,
 {
     int ret;
     char err_buf[256];
+    char stop_buf[300];
     size_t total = 0;
     struct tls_session *session = (struct tls_session *) u_conn->tls_session;
     struct tls_context *ctx;
+
+    flb_log_recurring_event_prefixed("tls_net_write", "start, ");
+
 
     ctx = session->parent;
     pthread_mutex_lock(&ctx->mutex);
@@ -445,9 +484,11 @@ static int tls_net_write(struct flb_upstream_conn *u_conn,
         ret = SSL_get_error(session->ssl, ret);
         if (ret == SSL_ERROR_WANT_WRITE) {
             ret = FLB_TLS_WANT_WRITE;
+            strcpy(err_buf, "SSL_ERROR_WANT_WRITE");
         }
         else if (ret == SSL_ERROR_WANT_READ) {
             ret = FLB_TLS_WANT_READ;
+            strcpy(err_buf, "SSL_ERROR_WANT_READ");
         }
         else {
             ERR_error_string_n(ret, err_buf, sizeof(err_buf)-1);
@@ -458,6 +499,9 @@ static int tls_net_write(struct flb_upstream_conn *u_conn,
 
     pthread_mutex_unlock(&ctx->mutex);
 
+    sprintf(stop_buf, "stop, %s", (ret <= 0) ? err_buf : "success");
+    flb_log_recurring_event_prefixed("tls_net_write", stop_buf);
+
     /* Update counter and check if we need to continue writing */
     return ret;
 }
@@ -466,8 +510,11 @@ static int tls_net_handshake(struct flb_tls *tls, void *ptr_session)
 {
     int ret = 0;
     char err_buf[256];
+    char stop_buf[300];
     struct tls_session *session = ptr_session;
     struct tls_context *ctx;
+
+    flb_log_recurring_event_prefixed("tls_net_handshake", "start,");
 
     ctx = session->parent;
     pthread_mutex_lock(&ctx->mutex);
@@ -487,8 +534,11 @@ static int tls_net_handshake(struct flb_tls *tls, void *ptr_session)
             //  EOF from the peer. This is fixed in OpenSSL 3.0.
             if (ret == 0) {
             	flb_error("[tls] error: unexpected EOF");
+                flb_log_recurring_event_prefixed("tls_net_handshake", "stop, unexpected EOF");
             } else {
                 ERR_error_string_n(ret, err_buf, sizeof(err_buf)-1);
+                sprintf(stop_buf, "stop, %s", err_buf);
+                flb_log_recurring_event_prefixed("tls_net_handshake", stop_buf);
                 flb_error("[tls] error: %s", err_buf);
             }
             pthread_mutex_unlock(&ctx->mutex);
@@ -497,15 +547,19 @@ static int tls_net_handshake(struct flb_tls *tls, void *ptr_session)
 
         if (ret == SSL_ERROR_WANT_WRITE) {
             pthread_mutex_unlock(&ctx->mutex);
+            flb_log_recurring_event_prefixed("tls_net_handshake", "stop, FLB_TLS_WANT_WRITE");
             return FLB_TLS_WANT_WRITE;
         }
         else if (ret == SSL_ERROR_WANT_READ) {
             pthread_mutex_unlock(&ctx->mutex);
+            flb_log_recurring_event_prefixed("tls_net_handshake", "stop, FLB_TLS_WANT_READ");
             return FLB_TLS_WANT_READ;
         }
     }
 
     pthread_mutex_unlock(&ctx->mutex);
+    flb_log_recurring_event_prefixed("tls_net_handshake", "stop, success");
+
     flb_trace("[tls] connection and handshake OK");
     return 0;
 }
