@@ -1245,6 +1245,26 @@ int flb_http_do(struct flb_http_client *c, size_t *bytes)
             c->resp.data[c->resp.data_len] = '\0';
 
             ret = process_data(c);
+            //char* res_summary = flb_malloc(c->header_len + c->body_len + 3);
+            //strncpy(res_summary, c->header_buf, c->header_len);
+            //strncpy(res_summary+c->header_len, ", ", 2);
+            //strncpy(res_summary+c->header_len+2, c->body_buf, c->body_len);
+            //res_summary[c->header_len + c->body_len + 2] = '\0';
+            //            char* req_id;
+            // int req_len;
+
+            // header_lookup(c, "x-amzn-RequestId: ", 18,
+            //            &req_id, &req_len);
+
+            // strncpy(res_summary, c->resp.data, c->resp.data_len);
+
+            char* res_summary = flb_malloc(c->resp.data_len + 1);
+            strncpy(res_summary, c->resp.data, c->resp.data_len);
+            res_summary[c->resp.data_len] = '\0';
+
+            flb_log_recurring_event("response-data", res_summary);
+            flb_free(res_summary);
+
             if (ret == FLB_HTTP_ERROR) {
                 flb_warn("[http_client] malformed HTTP response from %s:%i on "
                          "connection #%i", c->u_conn->u->tcp_host,
