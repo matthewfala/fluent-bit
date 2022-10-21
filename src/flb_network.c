@@ -49,6 +49,11 @@
 #include <monkey/mk_core.h>
 #include <ares.h>
 
+// Instrumentation start
+#include <fluent-bit/flb_output_thread.h>
+#include <fluent-bit/flb_thread_pool.h>
+// Instrumentation end
+
 #ifndef SOL_TCP
 #define SOL_TCP IPPROTO_TCP
 #endif
@@ -1183,6 +1188,7 @@ flb_sockfd_t flb_net_tcp_connect(const char *host, unsigned long port,
     char address[41];
     struct addrinfo hints;
     struct addrinfo *sorted_res, *res, *rp;
+    char stop_buf[100];
 
     if (is_async == FLB_TRUE && !u_conn) {
         flb_error("[net] invalid async mode with not set upstream connection");
@@ -1210,6 +1216,7 @@ flb_sockfd_t flb_net_tcp_connect(const char *host, unsigned long port,
     }
 
     /* retrieve DNS info */
+    flb_log_recurring_event_prefixed("flb_net_tcp_connect_getaddrinfo", "start, ");
     if (use_async_dns) {
         ret = flb_net_getaddrinfo(host, _port, &hints, &res,
                                   u_conn->u->net.dns_mode, connect_timeout);
@@ -1225,6 +1232,8 @@ flb_sockfd_t flb_net_tcp_connect(const char *host, unsigned long port,
         else {
             flb_warn("[net] getaddrinfo(host='%s', err=%d): %s", host, ret, gai_strerror(ret));
         }
+        sprintf(stop_buf, "stop, error=%s", (use_async_dns) ? ares_strerror(ret) : gai_strerror(ret));
+        flb_log_recurring_event_prefixed("flb_net_tcp_connect_getaddrinfo", "stop, dns_timeout");
 
         return -1;
     }
@@ -1241,8 +1250,10 @@ flb_sockfd_t flb_net_tcp_connect(const char *host, unsigned long port,
             freeaddrinfo(res);
         }
 
+        flb_log_recurring_event_prefixed("flb_net_tcp_connect_getaddrinfo", (u_conn->net_error) ? "stop, dns_timeout" : "stop, unknown_err");
         return -1;
     }
+
 
     sorted_res = res;
 
@@ -1259,9 +1270,14 @@ flb_sockfd_t flb_net_tcp_connect(const char *host, unsigned long port,
                 freeaddrinfo(res);
             }
 
+            flb_log_recurring_event_prefixed("flb_net_tcp_connect_getaddrinfo", "stop, result_error");
+
             return -1;
         }
     }
+
+    flb_log_recurring_event_prefixed("flb_net_tcp_connect_getaddrinfo", "stop, success");
+
 
     /*
      * Try to connect: on this iteration we try to connect to the first
