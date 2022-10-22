@@ -395,13 +395,17 @@ static int tls_session_destroy(void *session)
     pthread_mutex_lock(&ctx->mutex);
 
     if (flb_socket_error(ptr->fd) == 0) {
+
         ret = SSL_shutdown(ptr->ssl);
         sprintf(ret_str, "%i", ret);
         flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_1_ret", ret_str);
         sprintf(stop_buf, "openssl_err=%s, ret=%i, fd=%i", ERR_reason_error_string(ERR_get_error()), ret, ptr->fd);
         flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_1_msg", stop_buf);
 
-        ret = SSL_shutdown(ptr->ssl);
+        if (ret == 0 && flb_socket_error(ptr->fd) == 0) {
+            ret = SSL_shutdown(ptr->ssl);
+        }
+
         sprintf(ret_str, "%i", ret);
         flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_2_ret", ret_str);
         sprintf(stop_buf, "openssl_err=%s, ret=%i, fd=%i", ERR_reason_error_string(ERR_get_error()), ret, ptr->fd);
