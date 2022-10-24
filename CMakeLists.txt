@@ -43,7 +43,7 @@ if (MSVC)
   # Generator does not notice /MT in CMAKE_C_FLAGS.
   add_compile_options(/MT)
 else()
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -lanl")
 endif()
 
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")

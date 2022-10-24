@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <netdb.h>
 
 #ifdef FLB_SYSTEM_WINDOWS
 #define poll WSAPoll
@@ -34,6 +35,7 @@
 #endif
 
 #include <fluent-bit/flb_info.h>
+#include <fluent-bit/flb_time.h>
 #include <fluent-bit/flb_compat.h>
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_socket.h>
@@ -1188,7 +1190,10 @@ flb_sockfd_t flb_net_tcp_connect(const char *host, unsigned long port,
     char address[41];
     struct addrinfo hints;
     struct addrinfo *sorted_res, *res, *rp;
+    struct gaicb sync_request;
+    struct gaicb *sync_requests[1];
     char stop_buf[100];
+    struct flb_time sync_timeout_time;
 
     if (is_async == FLB_TRUE && !u_conn) {
         flb_error("[net] invalid async mode with not set upstream connection");
@@ -1222,7 +1227,16 @@ flb_sockfd_t flb_net_tcp_connect(const char *host, unsigned long port,
                                   u_conn->u->net.dns_mode, connect_timeout);
     }
     else {
-        ret = getaddrinfo(host, _port, &hints, &res);
+        /* Load our 1 sync request into DNS requests list */
+        sync_requests[0] = &sync_request;
+
+        sync_request.ar_name = host;
+        sync_request.ar_service = _port;
+        sync_request.ar_request = &hints;
+        sync_request.ar_result = res;
+
+        // ret = getaddrinfo(host, _port, &hints, &res);
+        ret = getaddrinfo_a(GAI_NOWAIT, sync_requests, 1, NULL);
     }
 
     if (ret) {
@@ -1236,6 +1250,36 @@ flb_sockfd_t flb_net_tcp_connect(const char *host, unsigned long port,
         flb_log_recurring_event_prefixed("flb_net_tcp_connect_getaddrinfo", "stop, dns_timeout");
 
         return -1;
+    }
+
+    /* Wait for the synchronous DNS call with timeout: UNIX systems only */
+    if (!use_async_dns) {
+        /* Suspend until connect timeout has been achieved */
+        flb_time_get(&sync_timeout_time);
+        sync_timeout_time.tm.tv_sec += connect_timeout;
+
+        ret = gai_suspend((const struct gaicb * const*) sync_requests, 1, &sync_timeout_time.tm);
+        if (ret) {
+            if (ret == EAI_AGAIN) {
+                flb_warn("[net] sync DNS lookup timed out after %i seconds",
+                         connect_timeout);
+            }
+            flb_warn("[net] getaddrinfo(host='%s', err=%d): %s", host, ret,
+                     gai_strerror(ret));
+            return -1;
+        }
+
+        /* DNS timed out :(
+         * This code is most likely not needed since the above if (ret)
+         * should catch timeouts
+         **/
+        ret = gai_error(sync_requests[1]);
+        if (ret == EAI_INPROGRESS) {
+            flb_warn("[net] sync DNS lookup timed out after %i seconds", connect_timeout);
+            return -1;
+        }
+
+        res = sync_request.ar_result;
     }
 
     if (u_conn->net_error > 0) {
