@@ -19,6 +19,7 @@
 
 #include <fluent-bit/flb_info.h>
 #include <fluent-bit/flb_time.h>
+#include <fluent-bit/flb_network.h>
 
 #ifdef FLB_HAVE_OPENSSL
 #include "openssl.c"
@@ -436,6 +437,9 @@ int flb_tls_session_destroy(struct flb_tls *tls, struct flb_upstream_conn *u_con
 {
     int ret;
 
+    /* Set socket to nonblocking mode so we don't hang on session destroys */
+    /* We'll destroy the fd right after so no need set back to blocking */
+    flb_net_socket_nonblocking(u_conn->fd);
     ret = tls->api->session_destroy(u_conn->tls_session);
     if (ret == -1) {
         return -1;
