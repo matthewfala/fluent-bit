@@ -396,20 +396,18 @@ static int tls_session_destroy(void *session)
 
     if (flb_socket_error(ptr->fd) == 0) {
 
+        /*
+         * Only one SSL_shutdown call is needed.
+         * If a unidirectional shutdown is enough (the underlying connection shall be
+         * closed anyway), this first call to SSL_shutdown() is sufficient.
+         * In order to complete the bidirectional shutdown handshake, SSL_shutdown()
+         * must be called again. https://man.openbsd.org/SSL_shutdown.3 
+        */
         ret = SSL_shutdown(ptr->ssl);
         sprintf(ret_str, "%i", ret);
         flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_1_ret", ret_str);
         sprintf(stop_buf, "openssl_err=%s, ret=%i, fd=%i", ERR_reason_error_string(ERR_get_error()), ret, ptr->fd);
         flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_1_msg", stop_buf);
-
-        if (ret == 0 && flb_socket_error(ptr->fd) == 0) {
-            ret = SSL_shutdown(ptr->ssl);
-        }
-
-        sprintf(ret_str, "%i", ret);
-        flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_2_ret", ret_str);
-        sprintf(stop_buf, "openssl_err=%s, ret=%i, fd=%i", ERR_reason_error_string(ERR_get_error()), ret, ptr->fd);
-        flb_log_recurring_event_prefixed("tls_session_destroy_shutdown_2_msg", stop_buf);
     }
     SSL_free(ptr->ssl);
     flb_free(ptr);
