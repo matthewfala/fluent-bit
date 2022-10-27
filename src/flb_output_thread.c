@@ -500,34 +500,6 @@ int flb_output_thread_pool_create(struct flb_config *config,
     return 0;
 }
 
-int flb_output_thread_pool_coros_size(struct flb_output_instance *ins)
-{
-    int n;
-    int size = 0;
-    struct mk_list *head;
-    struct flb_tp *tp = ins->tp;
-    struct flb_tp_thread *th;
-    struct flb_out_thread_instance *th_ins;
-
-    /* Signal each worker thread that needs to stop doing work */
-    mk_list_foreach(head, &tp->list_threads) {
-        th = mk_list_entry(head, struct flb_tp_thread, _head);
-        if (th->status != FLB_THREAD_POOL_RUNNING) {
-            continue;
-        }
-
-        th_ins = th->params.data;
-
-        pthread_mutex_lock(&th_ins->flush_mutex);
-        n = mk_list_size(&th_ins->flush_list);
-        pthread_mutex_unlock(&th_ins->flush_mutex);
-
-        size += n;
-    }
-
-    return size;
-}
-
 int flb_output_thread_pool_coro_in_progress(struct flb_output_instance *ins)
 {
     int size = 0;

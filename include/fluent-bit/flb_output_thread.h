@@ -95,7 +95,6 @@ struct flb_out_thread_instance {
 
 int flb_output_thread_pool_create(struct flb_config *config,
                                   struct flb_output_instance *ins);
-int flb_output_thread_pool_coros_size(struct flb_output_instance *ins);
 int flb_output_thread_pool_coro_in_progress(struct flb_output_instance *ins);
 void flb_output_thread_pool_destroy(struct flb_output_instance *ins);
 int flb_output_thread_pool_start(struct flb_output_instance *ins);

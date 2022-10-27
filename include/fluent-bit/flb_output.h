@@ -661,25 +661,6 @@ static inline void flb_output_return(int ret, struct flb_coro *co) {
     flb_output_flush_prepare_destroy(out_flush);
 }
 
-/* return the number of co-routines running in the instance */
-static inline int flb_output_coros_size(struct flb_output_instance *ins)
-{
-    int size = 0;
-
-    if (flb_output_is_threaded(ins) == FLB_TRUE) {
-        /*
-         * On threaded mode, we need to count the active co-routines of
-         * every running thread of the thread pool.
-         */
-        size = flb_output_thread_pool_coros_size(ins);
-    }
-    else {
-        size = mk_list_size(&ins->flush_list);
-    }
-
-    return size;
-}
-
 /* return FLB_TRUE if a co-routine is running on the instance */
 static inline int flb_output_coro_in_progress(struct flb_output_instance *ins)
 {
