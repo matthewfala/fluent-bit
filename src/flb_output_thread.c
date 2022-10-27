@@ -392,6 +392,13 @@ int flb_output_thread_pool_flush(struct flb_task *task,
         return -1;
     }
 
+    /* No multiplex track flush queue */
+    if (out_ins->flags & FLB_OUTPUT_NO_MULTIPLEX) {
+        pthread_mutex_lock(&th_ins->flush_mutex);
+        th_ins->flush_no_multiplex_queued = FLB_TRUE;
+        pthread_mutex_unlock(&th_ins->flush_mutex);
+    }
+
     return 0;
 }
 
@@ -434,6 +441,7 @@ int flb_output_thread_pool_create(struct flb_config *config,
         th_ins->flush_id = 0;
         mk_list_init(&th_ins->flush_list);
         mk_list_init(&th_ins->flush_list_destroy);
+        th_ins->flush_no_multiplex_queued = FLB_FALSE;
         pthread_mutex_init(&th_ins->flush_mutex, NULL);
         mk_list_init(&th_ins->upstreams);
 
@@ -518,6 +526,36 @@ int flb_output_thread_pool_coros_size(struct flb_output_instance *ins)
     }
 
     return size;
+}
+
+int flb_output_thread_pool_coro_in_progress(struct flb_output_instance *ins)
+{
+    int size = 0;
+    int is_flush_queued;
+    struct mk_list *head;
+    struct flb_tp *tp = ins->tp;
+    struct flb_tp_thread *th;
+    struct flb_out_thread_instance *th_ins;
+
+    mk_list_foreach(head, &tp->list_threads) {
+        th = mk_list_entry(head, struct flb_tp_thread, _head);
+        if (th->status != FLB_THREAD_POOL_RUNNING) {
+            continue;
+        }
+
+        th_ins = th->params.data;
+
+        pthread_mutex_lock(&th_ins->flush_mutex);
+        size = mk_list_size(&th_ins->flush_list);
+        is_flush_queued = th_ins->flush_no_multiplex_queued;
+        pthread_mutex_unlock(&th_ins->flush_mutex);
+
+        if (size > 0 || is_flush_queued) {
+            return FLB_TRUE;
+        }
+    }
+
+    return FLB_FALSE;
 }
 
 void flb_output_thread_pool_destroy(struct flb_output_instance *ins)

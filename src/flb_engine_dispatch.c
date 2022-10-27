@@ -175,7 +175,7 @@ static int tasks_start(struct flb_input_instance *in,
              * running something.
              */
             if (out->flags & FLB_OUTPUT_NO_MULTIPLEX) {
-                if (flb_output_coros_size(route->out) > 0 || retry > 0) {
+                if (flb_output_coro_in_progress(route->out) || retry > 0) {
                     continue;
                 }
             }

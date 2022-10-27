@@ -402,6 +402,7 @@ struct flb_output_instance {
     int flush_id;
     struct mk_list flush_list;
     struct mk_list flush_list_destroy;
+    int flush_no_multiplex_queued;
 
     /* Keep a reference to the original context this instance belongs to */
     struct flb_config *config;
@@ -580,10 +581,16 @@ struct flb_output_flush *flb_output_flush_create(struct flb_task *task,
 
         pthread_mutex_lock(&th_ins->flush_mutex);
         mk_list_add(&out_flush->_head, &th_ins->flush_list);
+        if (out_flush->o_ins->flags & FLB_OUTPUT_NO_MULTIPLEX) {
+            th_ins->flush_no_multiplex_queued = FLB_FALSE;
+        }
         pthread_mutex_unlock(&th_ins->flush_mutex);
     }
     else {
         mk_list_add(&out_flush->_head, &o_ins->flush_list);
+        if (out_flush->o_ins->flags & FLB_OUTPUT_NO_MULTIPLEX) {
+            o_ins->flush_no_multiplex_queued = FLB_FALSE;
+        }
     }
 
     /* Workaround for makecontext() */
@@ -671,6 +678,25 @@ static inline int flb_output_coros_size(struct flb_output_instance *ins)
     }
 
     return size;
+}
+
+/* return FLB_TRUE if a co-routine is running on the instance */
+static inline int flb_output_coro_in_progress(struct flb_output_instance *ins)
+{
+    int ret;
+
+    if (flb_output_is_threaded(ins) == FLB_TRUE) {
+        /*
+         * On threaded mode, we need to count the active co-routines of
+         * every running thread of the thread pool.
+         */
+        ret = flb_output_thread_pool_coro_in_progress(ins);
+    }
+    else {
+        ret = mk_list_size(&ins->flush_list) > 0 || ins->flush_no_multiplex_queued;
+    }
+
+    return ret;
 }
 
 static inline void flb_output_return_do(int x)
