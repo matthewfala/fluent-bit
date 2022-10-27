@@ -61,6 +61,7 @@
 #define FLB_OUTPUT_PLUGIN_PROXY    1
 #define FLB_OUTPUT_NO_MULTIPLEX  512
 #define FLB_OUTPUT_PRIVATE      1024
+#define FLB_OUTPUT_SYNCHRONOUS  2048
 
 
 /* Event type handlers */
@@ -357,6 +358,7 @@ struct flb_output_instance {
      * loaded (in backlog)
      */
     size_t fs_backlog_chunks_size;
+
     /*
      * Buffer limit: optional limit set by configuration so this output instance
      * cannot buffer more than total_limit_size (bytes unit).
@@ -366,6 +368,12 @@ struct flb_output_instance {
      * filesystem as buffer type.
      */
     size_t total_limit_size;
+
+    /*
+     * Boolean to track whether a synchronously scheduled task is running on the output
+     * plugin
+     */
+    int is_sync_task_running;
 
     /* Thread Pool: this is optional for the caller */
     int tp_workers;
