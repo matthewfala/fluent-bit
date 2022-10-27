@@ -450,6 +450,7 @@ struct flb_output_instance *flb_output_new(struct flb_config *config,
     instance->log_level = -1;
     instance->test_mode = FLB_FALSE;
     instance->is_threaded = FLB_FALSE;
+    instance->is_sync_task_running = FLB_FALSE;
     instance->tp_workers = plugin->workers;
 
     /* Retrieve an instance id for the output instance */
@@ -534,6 +535,7 @@ struct flb_output_instance *flb_output_new(struct flb_config *config,
 
     flb_kv_init(&instance->properties);
     flb_kv_init(&instance->net_properties);
+    mk_list_init(&instance->sync_flush_buffer);
     mk_list_init(&instance->upstreams);
     mk_list_init(&instance->flush_list);
     mk_list_init(&instance->flush_list_destroy);

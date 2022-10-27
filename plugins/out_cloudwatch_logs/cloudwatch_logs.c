@@ -666,7 +666,7 @@ struct flb_output_plugin out_cloudwatch_logs_plugin = {
     .cb_init      = cb_cloudwatch_init,
     .cb_flush     = cb_cloudwatch_flush,
     .cb_exit      = cb_cloudwatch_exit,
-    .flags        = FLB_OUTPUT_NO_MULTIPLEX,
+    .flags        = FLB_OUTPUT_SYNCHRONOUS,
     .workers      = 1,
 
     /* Configuration */
