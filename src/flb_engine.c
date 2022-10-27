@@ -174,6 +174,7 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
     struct flb_task *task;
     struct flb_task_retry *retry;
     struct flb_output_instance *ins;
+    struct flb_output_flush *buffered_flush;
 
     bytes = flb_pipe_r(fd, &val, sizeof(val));
     if (bytes == -1) {
@@ -373,6 +374,22 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
         flb_metrics_sum(FLB_METRIC_OUT_DROPPED_RECORDS, task->records, ins->metrics);
 #endif
         flb_task_users_dec(task, FLB_TRUE);
+    }
+    
+    /* Synchronous plugin task scheduler */
+    if (flb_output_is_threaded(ins) == FLB_FALSE) {
+        if (ret == FLB_OK || ret == FLB_RETRY || ret == FLB_ERROR) {
+            if (mk_list_is_empty(&ins->sync_flush_buffer) == 0) {
+                ins->is_sync_task_running = false;
+            }
+            else {
+                buffered_flush = mk_list_entry_first(&ins->sync_flush_buffer,
+                                                     struct flb_output_flush, _head_2);
+                mk_list_del(&buffered_flush->_head_2);
+                /* Dirty: We need to call clean up functions here. */
+                flb_coro_resume(buffered_flush->coro);
+            }
+        }
     }
 
     return 0;
@@ -840,7 +857,20 @@ int flb_engine_start(struct flb_config *config)
                     continue;
                 }
 
+                /* Synchronous task scheduling queue */
+                if (output_flush->o_ins->flags | FLB_OUTPUT_SYNCHRONOUS) {
+                    /* We can use length of out_ins->flush_list == 0 to check if no task */
+                    /* We might also be able to use out_ins->tasks len */
+                    if (output_flush->o_ins->is_sync_task_running) {
+                        /* Queue task in flush buffer */
+                        mk_list_add(&output_flush->_head_2,
+                                    &output_flush->o_ins->sync_flush_buffer);
+                        continue;
+                    }
+                }
+
                 /* Init coroutine */
+                output_flush->o_ins->is_sync_task_running = FLB_TRUE;
                 flb_coro_resume(output_flush->coro);
             }
             else if (event->type == FLB_ENGINE_EV_CUSTOM) {

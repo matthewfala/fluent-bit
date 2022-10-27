@@ -374,6 +374,7 @@ struct flb_output_instance {
      * plugin
      */
     int is_sync_task_running;
+    struct mk_list sync_flush_buffer;
 
     /* Thread Pool: this is optional for the caller */
     int tp_workers;
@@ -429,6 +430,7 @@ struct flb_output_flush {
     struct flb_output_instance *o_ins; /* output instance    */
     struct flb_coro *coro;             /* parent coro addr   */
     struct mk_list _head;              /* Link to flb_task->threads */
+    struct mk_list _head_2;            /* Link to flb_output->sync_flush_buffer */
 };
 
 static FLB_INLINE int flb_output_is_threaded(struct flb_output_instance *ins)
