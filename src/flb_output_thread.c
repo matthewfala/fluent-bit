@@ -393,7 +393,8 @@ int flb_output_thread_pool_flush(struct flb_task *task,
     }
 
     /* No multiplex track flush queue */
-    if (out_ins->flags & FLB_OUTPUT_NO_MULTIPLEX) {
+    if (out_ins->flags & FLB_OUTPUT_NO_MULTIPLEX ||
+        out_ins->flags & FLB_OUTPUT_NO_MULTIFLUSH) {
         pthread_mutex_lock(&th_ins->flush_mutex);
         th_ins->flush_no_multiplex_queued = FLB_TRUE;
         pthread_mutex_unlock(&th_ins->flush_mutex);

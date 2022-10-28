@@ -174,7 +174,12 @@ static int tasks_start(struct flb_input_instance *in,
              * If the plugin don't allow multiplexing Tasks, check if it's
              * running something.
              */
-            if (out->flags & FLB_OUTPUT_NO_MULTIPLEX) {
+            if (out->flags & FLB_OUTPUT_NO_MULTIFLUSH) {
+                if (flb_output_coro_in_progress(route->out)) {
+                    continue;
+                }
+            }
+            else if (out->flags & FLB_OUTPUT_NO_MULTIPLEX) {
                 if (flb_output_coro_in_progress(route->out) || retry > 0) {
                     continue;
                 }

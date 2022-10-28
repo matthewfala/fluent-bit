@@ -61,6 +61,7 @@
 #define FLB_OUTPUT_PLUGIN_PROXY    1
 #define FLB_OUTPUT_NO_MULTIPLEX  512
 #define FLB_OUTPUT_PRIVATE      1024
+#define FLB_OUTPUT_NO_MULTIFLUSH 2048
 
 
 /* Event type handlers */
@@ -581,14 +582,16 @@ struct flb_output_flush *flb_output_flush_create(struct flb_task *task,
 
         pthread_mutex_lock(&th_ins->flush_mutex);
         mk_list_add(&out_flush->_head, &th_ins->flush_list);
-        if (out_flush->o_ins->flags & FLB_OUTPUT_NO_MULTIPLEX) {
+        if (out_flush->o_ins->flags & FLB_OUTPUT_NO_MULTIPLEX ||
+            out_flush->o_ins->flags & FLB_OUTPUT_NO_MULTIFLUSH) {
             th_ins->flush_no_multiplex_queued = FLB_FALSE;
         }
         pthread_mutex_unlock(&th_ins->flush_mutex);
     }
     else {
         mk_list_add(&out_flush->_head, &o_ins->flush_list);
-        if (out_flush->o_ins->flags & FLB_OUTPUT_NO_MULTIPLEX) {
+        if (out_flush->o_ins->flags & FLB_OUTPUT_NO_MULTIPLEX ||
+            out_flush->o_ins->flags & FLB_OUTPUT_NO_MULTIFLUSH) {
             o_ins->flush_no_multiplex_queued = FLB_FALSE;
         }
     }
