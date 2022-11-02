@@ -375,6 +375,13 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
         flb_task_users_dec(task, FLB_TRUE);
     }
 
+    /* If we are in synchronous mode, flush one waiting task */
+    if (ins->flags & FLB_OUTPUT_SYNCHRONOUS) {
+        if (ret == FLB_OK || ret == FLB_RETRY || ret == FLB_ERROR) {
+            flb_output_task_singleplex_flush_next(ins->singleplex_queue);
+        }
+    }
+
     return 0;
 }
 

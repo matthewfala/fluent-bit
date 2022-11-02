@@ -75,7 +75,15 @@ int flb_engine_dispatch_retry(struct flb_task_retry *retry,
     flb_event_chunk_update(task->event_chunk, buf_data, buf_size);
 
     /* flush the task */
-    ret = flb_output_task_flush(task, retry->o_ins, config);
+    if (retry->o_ins->flags & FLB_OUTPUT_SYNCHRONOUS) {
+        /* If the plugin doesn't allow for multiplexing */
+        ret = flb_output_task_singleplex_enqueue(retry->o_ins->singleplex_queue,
+                                            task, retry->o_ins, config);
+    }
+    else {
+        ret = flb_output_task_flush(task, retry->o_ins, config);
+    }
+    
     if (ret == -1) {
         flb_task_retry_destroy(retry);
         return -1;
@@ -183,10 +191,20 @@ static int tasks_start(struct flb_input_instance *in,
             hits++;
 
             /*
-             * We have the Task and the Route, created a thread context for the
-             * data handling.
+             * If the plugin is in synchronous mode, enqueue the task and flush
+             * when appropriate.
              */
-            flb_output_task_flush(task, route->out, config);
+            if (out->flags & FLB_OUTPUT_SYNCHRONOUS) {
+                flb_output_task_singleplex_enqueue(route->out->singleplex_queue,
+                                                   task, route->out, config);
+            }
+            else {
+                /*
+                 * We have the Task and the Route, created a thread context for the
+                 * data handling.
+                 */
+                flb_output_task_flush(task, route->out, config);
+            }
 
             /*
             th = flb_output_thread(task,
