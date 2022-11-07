@@ -106,6 +106,7 @@ int flb_engine_flush(struct flb_config *config,
     struct flb_input_instance *in;
     struct flb_input_plugin *p;
     struct mk_list *head;
+    char task_count[20];
 
     mk_list_foreach(head, &config->inputs) {
         in = mk_list_entry(head, struct flb_input_instance, _head);
@@ -116,6 +117,9 @@ int flb_engine_flush(struct flb_config *config,
         }
         flb_engine_dispatch(0, in, config);
     }
+
+    sprintf(task_count, "%i", flb_task_running_count(config));
+    flb_log_recurring_event("task_count", task_count);
 
     return 0;
 }
