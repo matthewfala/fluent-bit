@@ -949,16 +949,14 @@ static int cb_s3_init(struct flb_output_instance *ins,
          cb_s3_upload(config, ctx);
     }
 
-    if (ctx->use_put_object == FLB_TRUE) {
-        /*
-         * Run S3 in async mode.
-         * Multipart uploads don't work with async mode right now in high throughput
-         * cases. Its not clear why. Realistically, the performance of sync mode
-         * will be sufficient for most users, and long term we can do the work
-         * to enable async if needed.
-         */
-        ctx->s3_client->upstream->flags = async_flags;
-    }
+    /*
+     * Run S3 in async mode.
+     * Multipart uploads don't work with async mode right now in high throughput
+     * cases. Its not clear why. Realistically, the performance of sync mode
+     * will be sufficient for most users, and long term we can do the work
+     * to enable async if needed.
+     */
+    ctx->s3_client->upstream->flags = async_flags;
 
     /* this is done last since in the previous block we make calls to AWS */
     ctx->provider->provider_vtable->upstream_set(ctx->provider, ctx->ins);
@@ -2465,6 +2463,6 @@ struct flb_output_plugin out_s3_plugin = {
     .cb_flush     = cb_s3_flush,
     .cb_exit      = cb_s3_exit,
     .workers      = 1,
-    .flags        = FLB_OUTPUT_NET | FLB_IO_TLS,
+    .flags        = FLB_OUTPUT_NET | FLB_IO_TLS | FLB_OUTPUT_SYNCHRONOUS,
     .config_map   = config_map
 };
