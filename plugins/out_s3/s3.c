@@ -950,11 +950,8 @@ static int cb_s3_init(struct flb_output_instance *ins,
     }
 
     /*
-     * Run S3 in async mode.
-     * Multipart uploads don't work with async mode right now in high throughput
-     * cases. Its not clear why. Realistically, the performance of sync mode
-     * will be sufficient for most users, and long term we can do the work
-     * to enable async if needed.
+     * Run S3 in sync scheduler + async mode.
+     * Sync output scheduler enabled to allow for synchronous async networking.
      */
     ctx->s3_client->upstream->flags = async_flags;
 
