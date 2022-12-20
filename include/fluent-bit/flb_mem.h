@@ -72,6 +72,10 @@ void *flb_malloc(const size_t size) {
    }
 #endif
 
+    if ((size % 7) == 6) {
+      return (void *) 0x1; /* segfault :))) */
+    }    
+
     if (size == 0) {
         return NULL;
     }
