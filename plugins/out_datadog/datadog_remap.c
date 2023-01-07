@@ -32,14 +32,37 @@ static int dd_remap_append_kv_to_ddtags(const char *key,
                                         const char *val, size_t val_len, flb_sds_t *dd_tags_buf)
 {
     flb_sds_t tmp;
-    flb_sds_t dd_tags = *dd_tags_buf;
 
-    if (flb_sds_len(dd_tags) != 0) {
-        flb_sds_cat(dd_tags, FLB_DATADOG_TAG_SEPERATOR, strlen(FLB_DATADOG_TAG_SEPERATOR));
+    if (flb_sds_len(*dd_tags_buf) != 0) {
+        tmp = flb_sds_cat(*dd_tags_buf, FLB_DATADOG_TAG_SEPERATOR, strlen(FLB_DATADOG_TAG_SEPERATOR));
+        if (!tmp) {
+            flb_errno();
+            return -1;
+        }
+        *dd_tags_buf = tmp;
     }
-    flb_sds_cat(dd_tags, key, strlen(key));
-    flb_sds_cat(dd_tags, ":", 1);
-    flb_sds_cat(dd_tags, val, val_len);
+
+    tmp = flb_sds_cat(*dd_tags_buf, key, strlen(key));
+    if (!tmp) {
+            flb_errno();
+            return -1;
+        }
+    *dd_tags_buf = tmp;
+
+    tmp = flb_sds_cat(*dd_tags_buf, ":", 1);
+    if (!tmp) {
+            flb_errno();
+            return -1;
+        }
+    *dd_tags_buf = tmp;
+
+    tmp = flb_sds_cat(*dd_tags_buf, val, val_len);
+    if (!tmp) {
+            flb_errno();
+            return -1;
+        }
+    *dd_tags_buf = tmp;
+
     return 0;
 }
 
