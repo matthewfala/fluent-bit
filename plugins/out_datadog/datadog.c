@@ -254,8 +254,11 @@ static int datadog_format(struct flb_config *config,
              * (so they won't be packed as attr)
              */
             if (ctx->remap && (ind = dd_attr_need_remapping(k, v)) >=0 ) {
-                remapping[ind].remap_to_tag(remapping[ind].remap_tag_name, v,
-                                            remapped_tags);
+                ret = remapping[ind].remap_to_tag(remapping[ind].remap_tag_name, v,
+                                                  &remapped_tags);
+                if (ret < 0) {
+                    flb_plg_error(ctx->ins, "Failed to remap tag: %s, skipping", remapping[ind].remap_tag_name);
+                }
                 continue;
             }
 
