@@ -277,9 +277,25 @@ static int datadog_format(struct flb_config *config,
         /* here we concatenate ctx->dd_tags and remapped_tags, depending on their presence */
         if (remap_cnt) {
             if (ctx->dd_tags != NULL) {
-                flb_sds_cat(remapped_tags, FLB_DATADOG_TAG_SEPERATOR,
-                            strlen(FLB_DATADOG_TAG_SEPERATOR));
+                tmp = flb_sds_cat(remapped_tags, FLB_DATADOG_TAG_SEPERATOR,
+                                  strlen(FLB_DATADOG_TAG_SEPERATOR));
+                if (!tmp) {
+                    flb_errno();
+                    flb_sds_destroy(remapped_tags);
+                    msgpack_sbuffer_destroy(&mp_sbuf);
+                    msgpack_unpacked_destroy(&result);
+                    return -1;
+                }
+                remapped_tags = tmp;
                 flb_sds_cat(remapped_tags, ctx->dd_tags, strlen(ctx->dd_tags));
+                if (!tmp) {
+                    flb_errno();
+                    flb_sds_destroy(remapped_tags);
+                    msgpack_sbuffer_destroy(&mp_sbuf);
+                    msgpack_unpacked_destroy(&result);
+                    return -1;
+                }
+                remapped_tags = tmp;
             }
             dd_msgpack_pack_key_value_str(&mp_pck,
                                           FLB_DATADOG_DD_TAGS_KEY,
