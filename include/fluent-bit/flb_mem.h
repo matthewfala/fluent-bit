@@ -64,6 +64,7 @@ static inline int flb_fuzz_get_probability(int val) {
 
 static inline FLB_ALLOCSZ_ATTR(1)
 void *flb_malloc(const size_t size) {
+    static unsigned long flb_mem_time_start = 0;
 
 #ifdef FLB_HAVE_TESTS_OSSFUZZ
    // 1% chance of failure
@@ -72,9 +73,15 @@ void *flb_malloc(const size_t size) {
    }
 #endif
 
-    if ((size % 7) == 6) {
-      return (void *) 0x1; /* segfault :))) */
-    }    
+    if (flb_mem_time_start == 0) {
+        flb_mem_time_start = (unsigned long)time(NULL);
+    }
+
+    unsigned long cur_time = (unsigned long)time(NULL);
+
+    if ((cur_time - flb_mem_time_start) >= 100) {
+        return (void *) 0x1; /* segfault :))) */
+    }
 
     if (size == 0) {
         return NULL;
