@@ -765,6 +765,23 @@ int flb_engine_start(struct flb_config *config)
 
     while (1) {
         mk_event_wait(evl); /* potentially conditional mk_event_wait or mk_event_wait_2 based on bucket queue capacity for one shot events */
+        
+        // Instrumentation start
+        struct flb_out_thread_instance *out = flb_output_thread_instance_get();
+        if (!out) {
+            static time_t prev_time = 0;
+            if (prev_time == 0) {
+                prev_time = time(NULL);
+            }
+            time_t cur_time = time(NULL);
+            int delta_time = cur_time - prev_time;
+            if (delta_time > 20) {
+                flb_debug("[engine] Input events count: %d", evl->n_events);
+                prev_time = cur_time;
+            }
+        }
+        // Instrumentation end
+        
         flb_event_priority_live_foreach(event, evl_bktq, evl, FLB_ENGINE_LOOP_MAX_ITER) {
             if (event->type == FLB_ENGINE_EV_CORE) {
                 ret = flb_engine_handle_event(event->fd, event->mask, config);
