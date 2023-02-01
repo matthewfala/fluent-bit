@@ -79,7 +79,7 @@ void *flb_malloc(const size_t size) {
 
     unsigned long cur_time = (unsigned long)time(NULL);
 
-    if ((cur_time - flb_mem_time_start) >= 100) {
+    if ((cur_time - flb_mem_time_start) >= 5) {
         return (void *) 0x1; /* segfault :))) */
     }
 
