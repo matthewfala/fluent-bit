@@ -270,6 +270,7 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
                      flb_output_name(ins), out_id);
         }
         flb_task_retry_clean(task, ins);
+        flb_info("[%s] Decrement: Plugin %s Task %p of id %i, users is: %i -> %i", task->i_ins->tag, ins->name, task, task->id, task->users, task->users-1);
         flb_task_users_dec(task, FLB_TRUE);
     }
     else if (ret == FLB_RETRY && config->is_running && !config->is_shutting_down) {
@@ -288,6 +289,7 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
                      task_id,
                      flb_input_name(task->i_ins),
                      flb_output_name(ins), out_id);
+            flb_info("[%s] Decrement: Plugin %s Task %p of id %i, users is: %i -> %i", task->i_ins->tag, ins->name, task, task->id, task->users, task->users-1);
             flb_task_users_dec(task, FLB_TRUE);
             return 0;
         }
@@ -319,12 +321,13 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
                      task_id,
                      flb_input_name(task->i_ins),
                      flb_output_name(ins));
-
+            flb_info("[%s] Decrement: Plugin %s Task %p of id %i, users is: %i -> %i", task->i_ins->tag, ins->name, task, task->id, task->users, task->users-1);
             flb_task_users_dec(task, FLB_TRUE);
             return 0;
         }
 
         /* Always destroy the old coroutine */
+        flb_info("[%s] Decrement: Plugin %s Task %p of id %i, users is: %i -> %i", task->i_ins->tag, ins->name, task, task->id, task->users, task->users-1);
         flb_task_users_dec(task, FLB_FALSE);
 
         /* Let the scheduler to retry the failed task/thread */
@@ -379,6 +382,7 @@ static inline int handle_output_event(flb_pipefd_t fd, uint64_t ts,
         flb_metrics_sum(FLB_METRIC_OUT_ERROR, 1, ins->metrics);
         flb_metrics_sum(FLB_METRIC_OUT_DROPPED_RECORDS, task->records, ins->metrics);
 #endif
+        flb_info("[%s] Decrement: Plugin %s Task %p of id %i, users is: %i -> %i", task->i_ins->tag, ins->name, task, task->id, task->users, task->users-1);
         flb_task_users_dec(task, FLB_TRUE);
     }
 

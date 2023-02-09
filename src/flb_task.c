@@ -452,6 +452,8 @@ void flb_task_destroy(struct flb_task *task, int del)
     struct flb_task_route *route;
     struct flb_task_retry *retry;
 
+    flb_info("[%s] Destroy  : Task %p of id %i, users is: %i", task->i_ins->tag, task, task->id, task->users);
+
     flb_debug("[task] destroy task=%p (task_id=%i)", task, task->id);
 
     /* Release task_id */

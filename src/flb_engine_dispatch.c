@@ -71,6 +71,8 @@ int flb_engine_dispatch_retry(struct flb_task_retry *retry,
         return -1;
     }
 
+    flb_info("[%s] RetryDisp: Plugin %s Task %p of id %i, users is: %i", task->i_ins->tag, retry->o_ins->name, task, task->id, task->users);
+
     /* Update the buffer reference */
     flb_event_chunk_update(task->event_chunk, buf_data, buf_size);
 
@@ -90,6 +92,7 @@ int flb_engine_dispatch_retry(struct flb_task_retry *retry,
         ret = flb_output_task_flush(task, retry->o_ins, config);
         if (ret == -1) {
             flb_task_retry_destroy(retry);
+
             return -1;
         }
     }
@@ -164,6 +167,7 @@ static int tasks_start(struct flb_input_instance *in,
         /* A task contain one or more routes */
         mk_list_foreach_safe(r_head, r_tmp, &task->routes) {
             route = mk_list_entry(r_head, struct flb_task_route, _head);
+            flb_info("[%s] Dispatch : Plugin %s Task %p of id %i, users is: %i", task->i_ins->tag,  route->out->name, task, task->id, task->users);
 
             /*
              * Test mode: if the output plugin is in test mode, just invoke
@@ -302,6 +306,7 @@ int flb_engine_dispatch(uint64_t id, struct flb_input_instance *in,
                                ic->in, ic,
                                tag_buf, tag_len,
                                config, &t_err);
+
         if (!task) {
             /*
              * If task creation failed, check the error status flag. An error

@@ -304,11 +304,14 @@ int flb_output_task_flush(struct flb_task *task,
     struct flb_output_flush *out_flush;
 
     if (flb_output_is_threaded(out_ins) == FLB_TRUE) {
+        flb_info("[%s] Increment: Plugin %s Task %p of id %i, users is: %i -> %i", task->i_ins->tag,  out_ins->name, task, task->id, task->users, task->users+1);
         flb_task_users_inc(task);
 
         /* Dispatch the task to the thread pool */
         ret = flb_output_thread_pool_flush(task, out_ins, config);
         if (ret == -1) {
+            flb_info("[%s] Decrement: Plugin %s Task %p of id %i, users is: %i -> %i", task->i_ins->tag, out_ins->name, task, task->id, task->users, task->users-1);
+
             flb_task_users_dec(task, FLB_FALSE);
 
             /* If we are in synchronous mode, flush one waiting task */
@@ -333,6 +336,8 @@ int flb_output_task_flush(struct flb_task *task,
         if (ret == -1) {
             flb_errno();
             flb_output_flush_destroy(out_flush);
+            flb_info("Decrement: Plugin %s Task %p of id %i, users is: %i -> %i", out_ins->name, task, task->id, task->users, task->users-1);
+
             flb_task_users_dec(task, FLB_FALSE);
 
             /* If we are in synchronous mode, flush one waiting task */
