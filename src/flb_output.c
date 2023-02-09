@@ -221,6 +221,12 @@ static int flb_output_task_queue_flush_one(struct flb_task_queue *queue)
     queued_task = mk_list_entry_first(&queue->pending, struct flb_task_enqueued, _head);
     mk_list_del(&queued_task->_head);
     mk_list_add(&queued_task->_head, &queue->in_progress);
+
+    /*
+     * Remove temporary user now that task is out of queue.
+     * Flush adds a user if it succeeds.
+     */
+    flb_task_users_dec(queued_task->task, FLB_FALSE);
     ret = flb_output_task_flush(queued_task->task,
                                 queued_task->out_instance,
                                 queued_task->config);
@@ -250,6 +256,9 @@ int flb_output_task_singleplex_enqueue(struct flb_task_queue *queue,
 {
     int ret;
     int is_empty;
+
+    /* Temporary increment of users while task is in queue */
+    flb_task_users_inc(task);
 
     /* Enqueue task */
     ret = flb_output_task_queue_enqueue(queue, retry, task, out_ins, config);
