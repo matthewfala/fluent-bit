@@ -100,7 +100,7 @@ struct syslog_conn *syslog_conn_add(int fd, struct flb_syslog *ctx)
     struct syslog_conn *conn;
     struct mk_event *event;
 
-    conn = flb_malloc(sizeof(struct syslog_conn));
+    conn = flb_calloc(1, sizeof(struct syslog_conn));
     if (!conn) {
         return NULL;
     }
