@@ -862,7 +862,7 @@ int flb_input_set_collector_time(struct flb_input_instance *in,
 {
     struct flb_input_collector *collector;
 
-    collector = flb_malloc(sizeof(struct flb_input_collector));
+    collector = flb_calloc(1, sizeof(struct flb_input_collector));
     if (!collector) {
         flb_errno();
         return -1;
