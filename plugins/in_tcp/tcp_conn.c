@@ -276,7 +276,7 @@ struct tcp_conn *tcp_conn_add(int fd, struct flb_in_tcp_config *ctx)
     struct tcp_conn *conn;
     struct mk_event *event;
 
-    conn = flb_malloc(sizeof(struct tcp_conn));
+    conn = flb_calloc(1, sizeof(struct tcp_conn));
     if (!conn) {
         flb_errno();
         return NULL;
