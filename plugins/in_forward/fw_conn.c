@@ -107,7 +107,7 @@ struct fw_conn *fw_conn_add(int fd, struct flb_in_fw_config *ctx)
     struct fw_conn *conn;
     struct mk_event *event;
 
-    conn = flb_malloc(sizeof(struct fw_conn));
+    conn = flb_calloc(1, sizeof(struct fw_conn));
     if (!conn) {
         flb_errno();
         return NULL;
