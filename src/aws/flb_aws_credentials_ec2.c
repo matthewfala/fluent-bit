@@ -145,6 +145,8 @@ int init_fn_ec2(struct flb_aws_provider *provider) {
 
     flb_debug("[aws_credentials] Init called on the EC2 IMDS provider");
     if (try_lock_provider(provider)) {
+        /* Async networking is required for timeout */
+        provider->provider_vtable->async(provider);
         ret = get_creds_ec2(implementation);
         unlock_provider(provider);
     }
@@ -248,7 +250,8 @@ struct flb_aws_provider *flb_ec2_provider_create(struct flb_config *config,
         return NULL;
     }
 
-    upstream->net.connect_timeout = FLB_AWS_CREDENTIAL_NET_TIMEOUT;
+    /* PUT request for IMDSv2 token may timeout if in Docker and hops = 1 */
+    upstream->net.connect_timeout = FLB_AWS_IMDS_TIMEOUT;
 
     implementation->client = generator->create();
     if (!implementation->client) {
