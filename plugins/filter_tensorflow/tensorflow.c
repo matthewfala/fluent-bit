@@ -50,7 +50,7 @@ void print_tensor_info(struct flb_tensorflow *ctx, const TfLiteTensor* tensor)
     char dims[100] = "";
 
     type = TfLiteTensorType(tensor);
-    sprintf(dims, "[tensorflow] type: %s  dimensions: {", TfLiteTypeGetName(type));
+    //sprintf(dims, "[tensorflow] type: %s  dimensions: {", TfLiteTypeGetName(type));
     for (i = 0; i < TfLiteTensorNumDims(tensor) - 1; i++) {
         sprintf(dims, "%s%d, ", dims, TfLiteTensorDim(tensor, i));
     }
@@ -137,6 +137,7 @@ static int cb_tf_init(struct flb_filter_instance *f_ins,
         flb_errno();
         return -1;
     }
+    ctx->ins = f_ins;
 
     tmp = flb_filter_get_property("input_field", f_ins);
     if (!tmp) {
@@ -207,8 +208,6 @@ static int cb_tf_init(struct flb_filter_instance *f_ins,
         ctx->normalization_value = flb_malloc(sizeof(float));
         *ctx->normalization_value = atof(tmp);
     }
-
-    ctx->ins = f_ins;
 
     ret = flb_filter_config_map_set(f_ins, (void *) ctx);
     if (ret == -1) {
